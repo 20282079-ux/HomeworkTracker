@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval'; font-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://cdn.jsdelivr.net https://generativelanguage.googleapis.com https://openrouter.ai; img-src 'self' data:;" />
+  <title>Homework Tracker</title>
+
+  <!-- PWA Meta -->
+  <meta name="theme-color" content="#0e0f1a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="HW Tracker" />
+  <meta name="description" content="Track your assignments and tests with style — a beautiful, offline-ready homework planner" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icon.svg" />
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📚</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/gamification.css" />
+  <link rel="stylesheet" href="css/devmode.css" />
+</head>
+<body>
+
+  <!-- Skip Navigation (Accessibility) -->
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <canvas id="confetti-canvas" aria-hidden="true"></canvas>
+
+  <!-- Dev Mode Trigger (triple-click title or Konami code) -->
+  <button class="dev-trigger-dot" onclick="DevMode.open()" title="..." aria-hidden="true"></button>
+
+  <!-- Live region for dynamic announcements -->
+  <div id="toast-container" role="log" aria-live="polite" aria-atomic="false"></div>
+
+  <div class="app">
+
+    <!-- ═══ HEADER ═══ -->
+    <header class="header">
+      <div class="header-left">
+        <h1 id="app-title">Homework <span>Tracker.</span></h1>
+        <p class="header-sub" id="header-sub">Track your assignments with style</p>
+      </div>
+      <nav class="header-actions" aria-label="App actions">
+        <button class="btn btn-ghost btn-sm" onclick="App.showKeybindsHelp()" id="keybinds-hint-btn" title="Keyboard shortcuts: hold F for focus mode, N for night sky, Q to focus quick-add, Esc to close" aria-label="Keyboard shortcuts help">⌨ Shortcuts</button>
+        <button class="btn btn-ghost btn-sm" onclick="App.toggleCompact()" id="compact-btn" title="Toggle compact view" aria-pressed="false">⊟ Compact</button>
+        <button class="btn btn-ghost btn-sm" onclick="App.openSettings()" title="Customize settings">⚙ Customize</button>
+        <button class="btn btn-primary" onclick="App.openAddForm()" id="add-btn">＋ Add Task</button>
+      </nav>
+    </header>
+
+    <!-- ═══ TAB NAVIGATION ═══ -->
+    <div class="tab-nav" role="tablist" aria-label="App sections">
+      <button class="tab-btn active" id="tab-hw" onclick="App.switchTab('hw')" role="tab" aria-selected="true" aria-controls="panel-hw">📚 Homework</button>
+      <button class="tab-btn" id="tab-tests" onclick="App.switchTab('tests')" role="tab" aria-selected="false" aria-controls="panel-tests">🧪 Tests</button>
+    </div>
+
+    <!-- ═══ MAIN CONTENT ═══ -->
+    <main id="main-content">
+
+      <!-- ══ HOMEWORK TAB ══ -->
+      <section id="panel-hw" class="tab-panel active" role="tabpanel" aria-labelledby="tab-hw">
+
+        <!-- Stats -->
+        <div class="stats-row" role="group" aria-label="Assignment statistics">
+          <div class="stat-card">
+            <div class="stat-label">Total</div>
+            <div class="stat-value accent" id="stat-total" aria-live="polite">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Done</div>
+            <div class="stat-value success" id="stat-done" aria-live="polite">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Overdue</div>
+            <div class="stat-value danger" id="stat-overdue" aria-live="polite">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Due Soon</div>
+            <div class="stat-value warn" id="stat-soon" aria-live="polite">0</div>
+          </div>
+        </div>
+
+        <!-- Progress -->
+        <div class="progress-wrap" role="group" aria-label="Overall progress">
+          <div class="progress-label">
+            <span>Overall Progress</span>
+            <span id="pct-label">0%</span>
+          </div>
+          <div class="progress-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Assignment completion progress">
+            <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+          </div>
+        </div>
+
+        <!-- Quick-Add Bar -->
+        <div class="quick-add-bar" role="group" aria-label="Quick add assignment">
+          <button class="voice-mic-btn" id="voice-mic-btn" onclick="Voice.toggle()" aria-label="Voice input" title="Click to speak your assignment">
+            <svg class="mic-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+              <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+              <line x1="12" x2="12" y1="19" y2="22"/>
+            </svg>
+            <span class="voice-pulse-ring"></span>
+          </button>
+          <input type="text" id="qa-input" class="quick-add-input" placeholder="Quick add: e.g. Math homework due Friday 30m high" oninput="App.onQuickAddInput(event)" onkeydown="App.onQuickAddKeydown(event)" onblur="scheduleHideSuggestions()" role="combobox" aria-expanded="false" aria-controls="qa-suggestions" aria-autocomplete="list" aria-label="Quick add assignment" />
+          <button class="btn btn-primary btn-sm" onclick="App.confirmQuickAdd()" aria-label="Add task">＋ Add</button>
+        </div>
+        <div id="qa-suggestions" class="qa-suggestions hidden" role="listbox" aria-label="Quick add suggestions"></div>
+        <!-- qa-history removed per user request; kept as a hidden sentinel so legacy code paths don't crash -->
+        <div id="qa-history" class="qa-history" style="display:none" aria-hidden="true" aria-label="(Removed: recent quick-add entries)"></div>
+        <div id="qa-preview" class="qa-preview hidden" aria-live="off"></div>
+
+        <!-- Toolbar -->
+        <div class="toolbar" role="search" aria-label="Filter and search assignments">
+          <div class="filter-chips" id="filter-chips" role="group" aria-label="Subject filters">
+            <button class="chip active" data-filter="All" onclick="App.setFilter(this)">All</button>
+          </div>
+          <label for="search-input" class="sr-only">Search assignments</label>
+          <input class="search-input" type="search" placeholder="🔍 Search…" oninput="App.filterTasks()" id="search-input" aria-label="Search assignments" />
+          <label for="sort-select" class="sr-only">Sort by</label>
+          <select class="sort-select" onchange="App.filterTasks()" id="sort-select" aria-label="Sort assignments">
+            <option value="created">Newest first</option>
+            <option value="due">Due date</option>
+            <option value="priority">Priority</option>
+            <option value="subject">Subject</option>
+            <option value="alpha">A–Z</option>
+          </select>
+          <label for="status-filter" class="sr-only">Filter by status</label>
+          <select class="sort-select" onchange="App.filterTasks()" id="status-filter" aria-label="Filter by status">
+            <option value="all">All status</option>
+            <option value="pending">Pending</option>
+            <option value="done">Completed</option>
+          </select>
+        </div>
+
+        <!-- Tasks list -->
+        <div id="tasks-list" class="tasks-list" role="list" aria-label="Assignments"></div>
+
+      </section>
+
+      <!-- ══ TESTS TAB ══ -->
+      <section id="panel-tests" class="tab-panel" role="tabpanel" aria-labelledby="tab-tests">
+
+        <!-- Upcoming Countdown -->
+        <div class="countdown-panel" id="countdown-panel">
+          <div class="countdown-title">⏳ Upcoming Tests</div>
+          <div class="countdown-grid" id="countdown-grid" aria-live="polite"></div>
+        </div>
+
+        <!-- Test Stats -->
+        <div class="test-stats-row" style="grid-template-columns:repeat(3,1fr)" role="group" aria-label="Test statistics">
+          <div class="stat-card">
+            <div class="stat-label">Total Tests</div>
+            <div class="stat-value accent" id="tstat-total">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Passed</div>
+            <div class="stat-value success" id="tstat-passed">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Upcoming</div>
+            <div class="stat-value warn" id="tstat-upcoming">0</div>
+          </div>
+        </div>
+
+        <!-- Test Toolbar -->
+        <div class="toolbar" style="margin-bottom:20px" role="search" aria-label="Filter and search tests">
+          <div class="filter-chips" id="test-filter-chips" role="group" aria-label="Test status filters">
+            <button class="chip active" data-filter="All" onclick="App.setTestFilter(this)">All</button>
+            <button class="chip" data-filter="upcoming" onclick="App.setTestFilter(this)">Upcoming</button>
+            <button class="chip" data-filter="passed" onclick="App.setTestFilter(this)">Passed</button>
+            <button class="chip" data-filter="failed" onclick="App.setTestFilter(this)">Failed</button>
+          </div>
+          <label for="test-search" class="sr-only">Search tests</label>
+          <input class="search-input" type="search" placeholder="🔍 Search tests…" oninput="App.renderTests()" id="test-search" aria-label="Search tests" />
+          <label for="test-sort" class="sr-only">Sort tests by</label>
+          <select class="sort-select" onchange="App.renderTests()" id="test-sort" aria-label="Sort tests">
+            <option value="created">Newest first</option>
+            <option value="date">Test date</option>
+            <option value="score">Score</option>
+            <option value="subject">Subject</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="App.openFlashcards()">🃏 Flashcards</button>
+          <button class="btn btn-primary btn-sm" onclick="App.openTestForm()">＋ Add Test</button>
+        </div>
+
+        <!-- Tests list -->
+        <div id="tests-list" class="tasks-list" role="list" aria-label="Tests"></div>
+
+      </section>
+
+      <!-- Calendar + Grade-Calculator panels removed per user request. -->
+
+    </main>
+  </div>
+
+  <!-- ═══ CONSTELLATION STARFIELD — slow-growing ambient sky ═══ -->
+  <div class="starfield" id="starfield"></div>
+
+  <!-- Constellation info panel — glassmorphism card bottom-right.
+       Lists all 5 constellations with metric progress when detail-mode is on. -->
+  <div id="constellation-panel" class="constellation-panel" aria-label="Constellation progress"></div>
+
+  <!-- Hold-mode hint — fades in whenever a view-mode hold key is active.
+       Note: there's no toggle. Press Escto force-clear, or just release the key. -->
+  <div id="mode-exit-hint" role="status" aria-live="polite">
+    Release key to exit ·
+    <kbd>Esc</kbd> force-clear
+  </div>
+
+  <!-- ═══ ADD/EDIT TASK MODAL ═══ -->
+  <div id="task-modal" class="overlay hidden" onclick="App.closeModalOutside(event)" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal" id="task-modal-inner">
+      <h2 class="modal-title" id="modal-title">📝 New Assignment</h2>
+      <div class="form-grid">
+        <div class="field">
+          <label for="m-title">Assignment Title *</label>
+          <input type="text" id="m-title" placeholder="e.g. Chapter 5 Problems" required aria-required="true" />
+        </div>
+        <div class="field">
+          <label for="m-subject">Subject</label>
+          <select id="m-subject"></select>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:12px">
+        <label for="m-notes">Notes / Description</label>
+        <textarea id="m-notes" placeholder="Any extra details…"></textarea>
+      </div>
+      <div class="form-grid-3">
+        <div class="field">
+          <label for="m-due">Due Date</label>
+          <input type="date" id="m-due" />
+        </div>
+        <div class="field">
+          <label for="m-priority">Priority</label>
+          <select id="m-priority">
+            <option>Low</option>
+            <option selected>Medium</option>
+            <option>High</option>
+            <option>Urgent</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="m-time">Est. Time (min)</label>
+          <input type="number" id="m-time" placeholder="30" min="1" max="999" />
+        </div>
+      </div>
+      <div class="form-grid" style="margin-bottom:16px">
+        <div class="field">
+          <label for="m-recurring">Recurring</label>
+          <select id="m-recurring">
+            <option value="">None</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="biweekly">Bi-weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="m-status">Status</label>
+          <select id="m-status">
+            <option value="pending">Pending</option>
+            <option value="in-progress">In Progress</option>
+            <option value="done">Done</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- ★ SUBTASK EDITOR ★ -->
+      <div class="subtask-editor" aria-label="Subtasks">
+        <div class="subtask-editor-title">☑ Subtasks</div>
+        <div class="subtask-input-row">
+          <label for="new-subtask-input" class="sr-only">Add subtask</label>
+          <input type="text" id="new-subtask-input" placeholder="Add a subtask…" />
+          <button class="btn btn-primary btn-sm" onclick="App.addSubtask()" aria-label="Add subtask">Add</button>
+        </div>
+        <div class="subtask-list" id="subtask-list"></div>
+      </div>
+
+      <div style="margin-top:8px;margin-bottom:4px">
+        <button class="btn btn-ghost btn-sm" onclick="saveAsTemplate()" style="font-size:11px" title="Save this task as a reusable template">📋 Save as Template</button>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-ghost" onclick="App.closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="App.saveTask()">Save Task</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SETTINGS MODAL ═══ -->
+  <div id="settings-modal" class="overlay hidden" onclick="App.closeSettingsOutside(event)" role="dialog" aria-modal="true" aria-label="Customize settings">
+    <div class="modal" id="settings-modal-inner" style="max-width:520px">
+      <h2 class="modal-title">🎨 Customize</h2>
+
+      <!-- Theme Colors -->
+      <div class="settings-section">
+        <h3 class="settings-section-title">🎨 Theme Colors</h3>
+        <div class="color-row">
+          <label for="c-bg">Background</label>
+          <input type="color" id="c-bg" oninput="App.applyColor('--bg', this.value)" aria-label="Background color" />
+          <input type="text" id="ct-bg" oninput="App.syncColorText('--bg','c-bg','ct-bg')" aria-label="Background hex value" />
+        </div>
+        <div class="color-row">
+          <label for="c-surface">Surface</label>
+          <input type="color" id="c-surface" oninput="App.applyColor('--bg2', this.value)" aria-label="Surface color" />
+          <input type="text" id="ct-surface" oninput="App.syncColorText('--bg2','c-surface','ct-surface')" aria-label="Surface hex value" />
+        </div>
+        <div class="color-row">
+          <label for="c-accent">Accent / Primary</label>
+          <input type="color" id="c-accent" oninput="App.applyColor('--accent', this.value); App.applyColor('--accent-glow', App.hexToRgba(this.value,0.18))" aria-label="Accent color" />
+          <input type="text" id="ct-accent" oninput="App.syncColorText('--accent','c-accent','ct-accent')" aria-label="Accent hex value" />
+        </div>
+        <div class="color-row">
+          <label for="c-text">Text Color</label>
+          <input type="color" id="c-text" oninput="App.applyColor('--text', this.value)" aria-label="Text color" />
+          <input type="text" id="ct-text" oninput="App.syncColorText('--text','c-text','ct-text')" aria-label="Text hex value" />
+        </div>
+        <div class="color-row">
+          <label for="c-border">Border Color</label>
+          <input type="color" id="c-border" oninput="App.applyColor('--border', this.value)" aria-label="Border color" />
+          <input type="text" id="ct-border" oninput="App.syncColorText('--border','c-border','ct-border')" aria-label="Border hex value" />
+        </div>
+      </div>
+
+      <!-- Presets -->
+      <div class="settings-section">
+        <h3 class="settings-section-title">✨ Theme Presets</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="App.applyPreset('midnight')">🌙 Midnight</button>
+          <button class="btn btn-ghost btn-sm" onclick="App.applyPreset('forest')">🌿 Forest</button>
+          <button class="btn btn-ghost btn-sm" onclick="App.applyPreset('ocean')">🌊 Ocean</button>
+          <button class="btn btn-ghost btn-sm" onclick="App.applyPreset('sunset')">🌅 Sunset</button>
+          <button class="btn btn-ghost btn-sm" onclick="App.applyPreset('rose')">🌸 Rose</button>
+          <button class="btn btn-ghost btn-sm" onclick="App.applyPreset('light')">☀️ Light</button>
+          <button class="btn btn-ghost btn-sm" onclick="App.applyPreset('coffee')">☕ Coffee</button>
+        </div>
+      </div>
+
+      <!-- Subjects -->
+      <div class="settings-section">
+        <h3 class="settings-section-title">📚 Subjects</h3>
+        <div id="subject-list"></div>
+        <div class="add-subject-row" style="margin-top:10px;gap:8px;display:flex">
+          <label for="new-subject-name" class="sr-only">New subject name</label>
+          <input type="text" id="new-subject-name" placeholder="New subject…"
+            style="flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-family:var(--font-body);font-size:13px;outline:none"
+            onkeydown="if(event.key==='Enter')App.addSubject()" />
+          <label for="new-subject-color" class="sr-only">New subject color</label>
+          <input type="color" id="new-subject-color" value="#7c6af7" style="width:44px;height:44px;border:none;border-radius:8px;padding:3px;background:var(--surface2);cursor:pointer" />
+          <button class="btn btn-primary btn-sm" onclick="App.addSubject()">Add</button>
+        </div>
+      </div>
+        <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">
+          <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">⚙ Custom Synonyms</div>
+          <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Map custom terms to courses. These are used by the quick-add parser.</div>
+          <div id="synonym-list"></div>
+          <div class="add-subject-row" style="margin-top:10px;gap:8px;display:flex">
+            <input type="text" id="new-synonym-term" placeholder="Term to map…"
+              style="flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-family:var(--font-body);font-size:13px;outline:none" />
+            <span style="color:var(--text3);font-size:12px">→</span>
+            <select id="new-synonym-target" style="flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-family:var(--font-body);font-size:13px;outline:none"></select>
+            <button class="btn btn-primary btn-sm" onclick="App.addSynonymFromUI()">Add</button>
+          </div>
+        </div>
+      
+
+      <!-- Templates -->
+      <div class="settings-section">
+        <h3 class="settings-section-title">📋 Templates</h3>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Click a template to auto-fill the task form. Save your own from the task modal.</div>
+        <div id="template-list"></div>
+      </div>
+
+      <!-- Data & Export -->
+      <div class="settings-section">
+        <h3 class="settings-section-title">🤖 AI Voice Parser</h3>
+
+        <!-- Provider selector -->
+        <div class="field" style="margin-bottom:10px">
+          <label for="s-ai-provider">AI Provider</label>
+          <select id="s-ai-provider" onchange="Voice.setProvider(this.value);App._refreshAISettings()" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-family:var(--font-body);font-size:13px;outline:none">
+            <option value="openrouter">OpenRouter (recommended — many free models)</option>
+            <option value="gemini">Google Gemini (native API)</option>
+          </select>
+        </div>
+
+        <!-- Model selector -->
+        <div class="field" style="margin-bottom:8px">
+          <label for="s-ai-model">Model</label>
+          <select id="s-ai-model" onchange="Voice.setModel(this.value)" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-family:var(--font-body);font-size:13px;outline:none">
+            <!-- populated dynamically by _refreshAISettings -->
+          </select>
+        </div>
+
+        <!-- OpenRouter key -->
+        <div id="ai-key-openrouter" class="field" style="margin-bottom:8px">
+          <label for="s-openrouter-key">OpenRouter API Key</label>
+          <div style="font-size:12px;color:var(--text3);margin-bottom:4px">Get a free key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">openrouter.ai/keys</a></div>
+          <div style="display:flex;gap:8px">
+            <input type="password" id="s-openrouter-key" placeholder="sk-or-..." value="" onchange="Voice.setOpenRouterKey(this.value)" style="flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-family:var(--font-body);font-size:13px;outline:none" />
+            <button class="btn btn-ghost btn-sm" onclick="var el=document.getElementById('s-openrouter-key');el.type=el.type==='password'?'text':'password';this.textContent=el.type==='password'?'👁':'🙈'" title="Show/hide key" style="flex-shrink:0;min-width:44px" aria-label="Toggle API key visibility">👁</button>
+          </div>
+        </div>
+
+        <!-- Gemini key -->
+        <div id="ai-key-gemini" class="field" style="margin-bottom:8px">
+          <label for="s-gemini-key">Gemini API Key</label>
+          <div style="font-size:12px;color:var(--text3);margin-bottom:4px">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">Google AI Studio</a></div>
+          <div style="display:flex;gap:8px">
+            <input type="password" id="s-gemini-key" placeholder="AIza..." value="" onchange="Voice.setGeminiKey(this.value)" style="flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-family:var(--font-body);font-size:13px;outline:none" />
+            <button class="btn btn-ghost btn-sm" onclick="var el=document.getElementById('s-gemini-key');el.type=el.type==='password'?'text':'password';this.textContent=el.type==='password'?'👁':'🙈'" title="Show/hide key" style="flex-shrink:0;min-width:44px" aria-label="Toggle API key visibility">👁</button>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+          <button class="btn btn-ghost btn-sm" onclick="Voice.setOpenRouterKey('');Voice.setGeminiKey('');document.getElementById('s-openrouter-key').value='';document.getElementById('s-gemini-key').value='';if(typeof toast==='function')toast('API keys cleared','',2000)">🗑 Clear Keys</button>
+          <span style="font-size:11px;color:var(--text3);align-self:center">Free tier • Keys stay on your device</span>
+        </div>
+      </div>
+
+      <!-- Data & Export -->
+      <div class="settings-section">
+        <h3 class="settings-section-title">📤 Data &amp; Export</h3>
+        <div class="toggle-row">
+          <label for="s-sound">Task-completion sound 🔊</label>
+          <label class="toggle"><input type="checkbox" id="s-sound" onchange="App.toggleSoundFromSettings(this)"><span class="toggle-slider"></span></label>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+          <button class="btn btn-ghost btn-sm" onclick="App.exportCSV()">↓ Export to CSV</button>
+          <button class="btn btn-ghost btn-sm" onclick="App.exportICS()">📅 Export to Calendar (.ics)</button>
+        </div>
+      </div>
+
+      <!-- App Settings -->
+      <div class="settings-section">
+        <h3 class="settings-section-title">⌨️ Hold-key shortcuts</h3>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Press and <strong>hold</strong> a key to enter that mode; release to return to your theme. Set both keys to <kbd>␣</kbd> (empty input) to disable.</div>
+        <div class="hold-key-row">
+          <label for="hk-focus">🌌 Focus</label>
+          <input type="text" id="hk-focus" maxlength="1" readonly value="f" onkeydown="event.preventDefault();if(event.key==='Backspace'||event.key==='Delete'){this.value='';App.setHoldKey('focus','');}else if(event.key.length===1&&!event.ctrlKey&&!event.metaKey&&!event.altKey){this.value=event.key.toLowerCase();App.setHoldKey('focus',event.key);}" />
+          <span class="hk-hint">hold to fade UI over current theme</span>
+        </div>
+        <div class="hold-key-row">
+          <label for="hk-nightsky">🌠 Night Sky</label>
+          <input type="text" id="hk-nightsky" maxlength="1" readonly value="n" onkeydown="event.preventDefault();if(event.key==='Backspace'||event.key==='Delete'){this.value='';App.setHoldKey('nightSky','');}else if(event.key.length===1&&!event.ctrlKey&&!event.metaKey&&!event.altKey){this.value=event.key.toLowerCase();App.setHoldKey('nightSky',event.key);}" />
+          <span class="hk-hint">hold for full night sky regardless of theme</span>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="App.resetHoldKeys()" style="margin-top:6px">↺ Reset to defaults (F / N)</button>
+      </div>
+
+      <div class="settings-section">
+        <h3 class="settings-section-title">⚙️ Settings</h3>
+        <div class="toggle-row">
+          <label for="s-show-done">Show completed tasks</label>
+          <label class="toggle"><input type="checkbox" id="s-show-done" checked onchange="App.filterTasks()"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <label for="s-compact">Compact view</label>
+          <label class="toggle"><input type="checkbox" id="s-compact" onchange="App.toggleCompactFromSettings(this)"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <label for="s-confetti">Confetti on completion 🎉</label>
+          <label class="toggle"><input type="checkbox" id="s-confetti" checked><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <label for="s-group">Group tasks by subject</label>
+          <label class="toggle"><input type="checkbox" id="s-group" onchange="App.filterTasks()"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <label for="s-auto-theme">🌓 Auto time-of-day theme (EST)</label>
+          <label class="toggle"><input type="checkbox" id="s-auto-theme" onchange="App.toggleAutoTheme(this)"><span class="toggle-slider"></span></label>
+        </div>
+        <div style="margin-top:8px">
+          <label for="s-radius" style="font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--text3);font-weight:600;display:block;margin-bottom:8px">Border Radius: <span id="radius-val">14px</span></label>
+          <input type="range" min="0" max="28" value="14" id="s-radius" oninput="App.applyRadius(this.value)" />
+        </div>
+      </div>
+
+      <!-- Rename + Data -->
+      <div class="settings-section">
+        <h3 class="settings-section-title">📝 App Title</h3>
+        <div class="field" style="margin-bottom:12px">
+          <label for="s-title" class="sr-only">App title</label>
+          <input type="text" id="s-title" placeholder="App title…" value="Homework Tracker" oninput="App.updateTitle(this.value)" style="background:var(--surface2)" />
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap">
+        <button class="btn btn-danger btn-sm" onclick="App.clearAllTasks()">🗑 Clear All Tasks</button>
+        <button class="btn btn-ghost btn-sm" onclick="App.clearQuickAddHistory()">🧹 Clear Suggestions</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost btn-sm" onclick="App.resetSettings()">↺ Reset Theme</button>
+          <button class="btn btn-primary" onclick="App.closeSettings()">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ADD/EDIT TEST MODAL ═══ -->
+  <div id="test-modal" class="overlay hidden" onclick="App.closeTestModalOutside(event)" role="dialog" aria-modal="true" aria-labelledby="test-modal-title">
+    <div class="modal" id="test-modal-inner">
+      <h2 class="modal-title" id="test-modal-title">🧪 New Test</h2>
+      <div class="form-grid">
+        <div class="field">
+          <label for="t-title">Test / Exam Name *</label>
+          <input type="text" id="t-title" placeholder="e.g. Math Test 6/19" required aria-required="true" />
+        </div>
+        <div class="field">
+          <label for="t-subject">Subject</label>
+          <select id="t-subject"></select>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label for="t-date">Test Date</label>
+          <input type="date" id="t-date" />
+        </div>
+        <div class="field">
+          <label for="t-type">Type</label>
+          <select id="t-type">
+            <option value="Quiz">Quiz</option>
+            <option value="Test">Test</option>
+            <option value="Midterm">Midterm</option>
+            <option value="Final">Final</option>
+            <option value="Project">Project</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid" style="margin-bottom:12px">
+        <div class="field">
+          <label for="t-score">Score (%)</label>
+          <input type="number" id="t-score" placeholder="e.g. 87" min="0" max="100" />
+        </div>
+        <div class="field">
+          <label for="t-maxscore">Max Score (optional)</label>
+          <input type="number" id="t-maxscore" placeholder="e.g. 100" min="1" />
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:16px">
+        <label for="t-notes">Notes</label>
+        <textarea id="t-notes" placeholder="Topics covered, what to review…"></textarea>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-ghost" onclick="App.closeTestModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="App.saveTest()">Save Test</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ★ SECRET DEV MODE ★ -->
+  <div id="dev-overlay" class="dev-overlay hidden">
+    <div class="dev-modal">
+      <canvas id="matrix-canvas"></canvas>
+      <div class="dev-header">
+        <h2>🖥️ Dev Console</h2>
+        <div class="dev-status">LIVE</div>
+        <button class="btn btn-ghost btn-sm dev-close-btn" onclick="DevMode.close()" aria-label="Close dev panel">✕</button>
+      </div>
+      <div class="dev-body">
+
+        <!-- Current Stats -->
+        <div class="dev-section">
+          <div class="dev-section-title">📊 Current State</div>
+          <div id="dev-stats-info"></div>
+        </div>
+
+        <!-- Coins -->
+        <div class="dev-section">
+          <div class="dev-section-title">🪙 Coins</div>
+          <div class="dev-input-row">
+            <input type="number" class="dev-input" id="dev-coin-amount" placeholder="Amount..." value="1000" />
+            <button class="dev-btn" onclick="DevMode.addCoins(document.getElementById('dev-coin-amount').value)">+ Add</button>
+          </div>
+        </div>
+
+        <!-- Speed -->
+        <div class="dev-section">
+          <div class="dev-section-title">⚡ Timer Speed</div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <input type="range" class="dev-speed-slider" id="dev-speed-slider" min="1" max="100" value="1" oninput="DevMode.setSpeed(this.value)" />
+            <span class="dev-speed-val" id="dev-speed-val">1x</span>
+          </div>
+          <button class="dev-btn" onclick="DevMode.resetSpeed()" style="margin-top:6px">↺ Reset Speed</button>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="dev-section">
+          <div class="dev-section-title">⚡ Quick Actions</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <button class="dev-btn" onclick="DevMode.instantComplete()">⚡ Instant Complete</button>
+            <button class="dev-btn" onclick="DevMode.unlockAllSpecies()">🌟 Unlock All Species</button>
+            <button class="dev-btn" onclick="DevMode.maxStats()">👑 Max All Stats</button>
+            <button class="dev-btn warn" onclick="DevMode.fillGarden(20)">🌿 Add 20 Trees</button>
+            <button class="dev-btn warn" onclick="DevMode.fillGarden(50)">🌳 Add 50 Trees</button>
+          </div>
+        </div>
+
+        <!-- Easter Eggs -->
+        <div class="dev-section">
+          <div class="dev-section-title">🥚 Easter Eggs</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <button class="dev-btn" onclick="DevMode.partyMode()">🎉 Party Mode</button>
+            <button class="dev-btn" onclick="DevMode.matrixMode()">🟢 Matrix Mode</button>
+            <button class="dev-btn" onclick="DevMode.glitchTitle()">⚠️ Glitch Title</button>
+          </div>
+          <div class="dev-console" style="margin-top:10px">
+            <div style="font-size:10px;color:#00ff41;margin-bottom:6px;opacity:0.5">&gt; Type a command (try "help"):</div>
+            <input type="text" class="dev-console-input" id="dev-console-input" placeholder="$ " onkeydown="if(event.key==='Enter'){DevMode.secretConsole(this.value);this.value='';}" />
+          </div>
+        </div>
+
+        <!-- Achievements -->
+        <div class="dev-section">
+          <div class="dev-section-title">🏆 Dev Achievements</div>
+          <div class="dev-achievements-grid" id="dev-achievements"></div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="dev-section">
+          <div class="dev-section-title" style="color:#ff4141">⚠️ Danger Zone</div>
+          <button class="dev-btn danger" onclick="DevMode.resetAllData()">🗑 Reset All Gamification Data</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ COMMAND PALETTE ═══ -->
+  <div id="command-palette" class="cmd-palette-overlay hidden" role="dialog" aria-modal="true" aria-label="Command palette">
+    <div class="cmd-palette-modal">
+      <div class="cmd-palette-header">
+        <span class="cmd-palette-icon">⌘</span>
+        <input type="text" id="cmd-palette-input" class="cmd-palette-input" placeholder="Type a command…" autocomplete="off" aria-label="Search commands" />
+        <kbd class="cmd-palette-kbd">Esc</kbd>
+      </div>
+      <div id="cmd-palette-results" class="cmd-palette-results" role="listbox" aria-label="Command results"></div>
+      <div class="cmd-palette-footer">
+        <span>↑↓ navigate</span>
+        <span>↵ select</span>
+        <span>Esc close</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ FLASHCARD MODAL ═══ -->
+  <div id="flashcard-overlay" class="flashcard-overlay hidden" onclick="App.closeFlashcardsOutside(event)" role="dialog" aria-modal="true" aria-label="Flashcard review">
+    <div class="flashcard-modal">
+      <div class="flashcard-header">
+        <h2 style="font-family:var(--font-head);font-size:16px;font-weight:800">🃏 Flashcard Review</h2>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="flashcard-progress" id="fc-progress" aria-live="polite">1 / 5</span>
+          <button class="btn btn-ghost btn-sm" onclick="App.closeFlashcards()" aria-label="Close flashcards">✕</button>
+        </div>
+      </div>
+      <div class="fc-scene" onclick="App.flipCard()" role="button" tabindex="0" aria-label="Click to flip flashcard" onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();App.flipCard();}">
+        <div class="fc-card" id="fc-card">
+          <div class="fc-face fc-front">
+            <div class="fc-face-label">Test</div>
+            <div class="fc-face-text" id="fc-front-text">Test Name</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:8px" id="fc-front-sub">Subject • Type</div>
+          </div>
+          <div class="fc-face fc-back">
+            <div class="fc-face-label">Score</div>
+            <div class="fc-face-score" id="fc-back-score" style="color:var(--success)">A</div>
+            <div id="fc-back-pct" style="font-size:14px;color:var(--text2);font-weight:600"></div>
+            <div id="fc-back-notes" style="font-size:12px;color:var(--text2);margin-top:8px;max-height:60px;overflow:auto"></div>
+          </div>
+        </div>
+      </div>
+      <p class="fc-hint">Click card to flip • Use arrows to navigate</p>
+      <div class="fc-nav" style="margin-top:14px">
+        <button class="btn btn-ghost" onclick="App.fcPrev()" aria-label="Previous flashcard">← Prev</button>
+        <button class="btn btn-ghost btn-sm" onclick="App.shuffleFlashcards()" title="Shuffle" aria-label="Shuffle flashcards">🔀</button>
+        <button class="btn btn-ghost" onclick="App.fcNext()" aria-label="Next flashcard">Next →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ CHRONO-NODE (date parsing) via CDN ESM ═══ -->
+  <script type="importmap">
+    { "imports": { "chrono-node": "https://cdn.jsdelivr.net/npm/chrono-node@2.9.1/dist/esm/index.js" } }
+  </script>
+  <script type="module">
+    import * as chrono from 'chrono-node';
+    window.chrono = chrono;
+  </script>
+
+  <!-- ═══ COMPROMISE.JS (NLP: POS tagging, noun phrases, numbers, adjectives) via CDN ═══ -->
+  <script src="https://cdn.jsdelivr.net/npm/compromise@14/builds/compromise.min.js"></script>
+
+  <!-- ═══ MODULAR JS LOAD ORDER ═══ -->
+  <script src="js/gamification.js"></script>
+  <script src="js/devmode.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/quickadd.js"></script>
+  <script src="js/tasks.js"></script>
+  <script src="js/tests.js"></script>
+  <script src="js/settings.js"></script>
+  <script src="js/command-palette.js"></script>
+  <script src="js/parser.js"></script>
+  <script src="js/calendar.js"></script>
+  <script src="js/gradecalc.js"></script>
+  <script src="js/voice.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

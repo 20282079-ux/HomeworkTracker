@@ -1,0 +1,741 @@
+/* ═══════════════════════════════════════════════════════════════
+   CONSTELLATION STARFIELD — ambient motivation layer
+   Five named constellations, each tied to one productivity
+   metric. Stars are inherently varied (size, color, twinkle)
+   — no polygon creatures, just light points in dark space.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── Sky backdrop ───
+   Sits behind the app (z-index: 0). Confetti canvas remains above. */
+.starfield {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 30%,
+      rgba(40,32,90,0.42) 0%,
+      rgba(20,18,40,0.18) 40%,
+      rgba(0,0,0,0) 70%),
+    radial-gradient(ellipse 70% 50% at 20% 80%,
+      rgba(70,40,80,0.20) 0%,
+      rgba(40,20,50,0.10) 50%,
+      rgba(0,0,0,0) 80%);
+}
+/* Confetti canvas (owned by app.js) sits above the starfield always.
+   This rule reassures it when it's a sibling of `.starfield`. */
+#confetti-canvas { z-index: 998; }
+
+/* ─── Ambient background stars ─── */
+.starfield-ambient {
+  position: absolute;
+  inset: 0;
+}
+.star-ambient {
+  position: absolute;
+  background: #fff;
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow: 0 0 1px rgba(255,255,255,0.5);
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+/* Ambient stars large enough to carry interactive data (≥2px).
+   They get a subtle glow on hover + cursor change so the user
+   knows every dot in the sky has astrophysical info.
+
+   A transparent ::after pseudo-element inflates the hit area
+   by 6px on all sides so these ~2px dots are actually hoverable
+   with a mouse — CSS transform: scale() doesn't expand the
+   hit-test region on its own. */
+.star-ambient-interactive {
+  pointer-events: auto;
+  cursor: crosshair;
+}
+.star-ambient-interactive::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  pointer-events: auto;
+}
+.star-ambient-interactive:hover {
+  box-shadow:
+    0 0 3px var(--sp-tint, rgba(255,255,255,0.6)),
+    0 0 6px var(--sp-tint, rgba(255,255,255,0.35));
+  transform: scale(1.35);
+  z-index: 1;
+}
+
+/* Twinkle keyframes — single shared animation referenced by all stars.
+   Each star's `animation-delay` and `animation-duration` shift it
+   out of phase so the sky feels alive without synchronized pulsing.
+
+   --twinkle-amp controls scintillation strength (0–1). Real stars
+   twinkle more the dimmer they are — brighter stars have almost no
+   visible flicker because atmospheric turbulence affects them less
+   (their light cone is wider at the aperture). JS sets this per-star
+   from apparent magnitude: mag 0 → amp 0.03, mag 7 → amp 0.65.
+
+   --px-offset-x / --px-offset-y are global parallax offsets (px),
+   set on .starfield by a mousemove handler. --parallax-depth (0–1)
+   is per-star: closer stars shift more, distant stars barely move.
+   The translate() is baked into the keyframes so both parallax and
+   twinkle scale compose in a single transform property.
+
+   Full brightness at 0%/100%, dim+shrink at 50% midpoint. */
+@keyframes sf-twinkle {
+  0%, 100% {
+    opacity: var(--base-op, 0.5);
+    transform:
+      translate(
+        calc(var(--px-offset-x, 0px) * var(--parallax-depth, 0)),
+        calc(var(--px-offset-y, 0px) * var(--parallax-depth, 0))
+      )
+      scale(1);
+  }
+  50% {
+    opacity: calc(var(--base-op, 0.5) - var(--base-op, 0.5) * var(--twinkle-amp, 0.35));
+    transform:
+      translate(
+        calc(var(--px-offset-x, 0px) * var(--parallax-depth, 0)),
+        calc(var(--px-offset-y, 0px) * var(--parallax-depth, 0))
+      )
+      scale(calc(1 - var(--twinkle-amp, 0.35) * 0.45));
+  }
+}
+
+/* Lensing pulse — gravitational glow when the cursor hovers a star.
+   Separate animations for SVG stars (filter: drop-shadow) and ambient
+   HTML dots (box-shadow) since they use different glow primitives.
+   Runs alongside the twinkle animation without transform conflicts. */
+@keyframes sf-lensing {
+  0%, 100% {
+    filter: drop-shadow(0 0 2px var(--cn-color, var(--sp-tint, rgba(255,255,255,0.3))))
+            drop-shadow(0 0 5px var(--cn-accent, var(--sp-tint, rgba(255,255,255,0.15))));
+  }
+  50% {
+    filter: drop-shadow(0 0 10px var(--cn-color, var(--sp-tint, rgba(255,255,255,0.7))))
+            drop-shadow(0 0 22px var(--cn-accent, var(--sp-tint, rgba(255,255,255,0.45))))
+            drop-shadow(0 0 38px rgba(255,255,255,0.12));
+  }
+}
+@keyframes sf-lensing-ambient {
+  0%, 100% {
+    box-shadow: 0 0 3px var(--sp-tint, rgba(255,255,255,0.4)),
+                0 0 6px var(--sp-tint, rgba(255,255,255,0.2));
+  }
+  50% {
+    box-shadow: 0 0 8px var(--sp-tint, rgba(255,255,255,0.7)),
+                0 0 18px var(--sp-tint, rgba(255,255,255,0.4)),
+                0 0 30px rgba(255,255,255,0.15);
+  }
+}
+
+/* ─── Each constellation is an SVG block ─── */
+.constellation {
+  position: absolute;
+  width: 240px;
+  height: 200px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: 0.55;
+  transition: opacity 0.6s ease;
+}
+.constellation.has-growth-detail,
+.starfield.detail-mode .constellation { opacity: 0.92; }
+
+/* The SVG inside fills the slot; preserveAspectRatio is set in JS so
+   xMidYMid centers the (neg+pos) viewBox around the constellation. */
+.constellation-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 0 18px rgba(0,0,0,0.35));
+}
+
+/* A single star inside an SVG. JS sets size + animation per star.
+   Lit class adds the glow halo. transform-box: fill-box ensures
+   twinkle scales around each star's own centre, not the viewBox origin.
+
+   Un-lit named stars get --sp-tint (spectral-type colour, set inline)
+   so their base fill reflects their real HR-diagram hue — blue-white
+   for O/B, yellow for G, red-orange for M, etc. The :not(.lit) guard
+   ensures the tint disappears when the star lights up (lit → cn-color). */
+.constellation-stars .star {
+  fill: rgba(220, 218, 235, 0.55);
+  transition: fill 0.7s ease, opacity 0.7s ease;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.constellation-stars .star.named:not(.lit) {
+  fill: color-mix(in srgb, rgba(220, 218, 235, 0.62), var(--sp-tint, #f2f5ff) 38%);
+}
+.constellation-stars .star.lit {
+  fill: var(--cn-color, #f4c98a);
+  filter:
+    drop-shadow(0 0 4px var(--cn-color, #f4c98a))
+    drop-shadow(0 0 9px var(--cn-accent, #ffe2a8));
+}
+
+/* Constellation connecting lines (between LIT stars only, drawn in JS). */
+.constellation-lines line {
+  fill: none;
+}
+
+/* Slot-level states (driven by lit count in JS) */
+.constellation.budding .constellation-stars .star.lit {
+  fill: var(--cn-accent, #ffe2a8);
+}
+.constellation.full {
+  filter: drop-shadow(0 0 14px var(--cn-color, #f4c98a));
+}
+.constellation.full .constellation-stars .star.lit {
+  fill: var(--cn-accent, #ffe2a8);
+}
+
+/* ─── Constellation label ───
+   Default: invisible. Only revealed when `○` chip is on (detail-mode). */
+.constellation-label {
+  position: absolute;
+  left: 50%;
+  bottom: -2px;
+  transform: translateX(-50%) translateY(2px);
+  padding: 4px 11px;
+  background: rgba(0,0,0,0.55);
+  color: var(--cn-color, #cfd8e8);
+  font-family: 'Cormorant Garamond', 'Iowan Old Style', Georgia, serif;
+  font-style: italic;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  z-index: 2;
+}
+/* Inline constellation labels are now replaced by the glassmorphism
+   info panel (#constellation-panel) bottom-right. Keep hidden. */
+.constellation-label { display: none; }
+
+/* ─── Opt-in detail toggle ─── */
+.starfield-toggle {
+  position: absolute;
+  right: 24px;
+  bottom: 22px;
+  width: 40px;
+  height: 36px;
+  border-radius: 12px;
+  background: rgba(0,0,0,0.5);
+  color: #e0dce8;
+  border: 1px solid rgba(255,255,255,0.12);
+  font-size: 11px;
+  font-weight: 600;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  pointer-events: auto;
+  font-family: var(--font-body, system-ui);
+  opacity: 0.8;
+  transition: opacity 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  user-select: none;
+  z-index: 3;
+  box-shadow: 0 0 16px rgba(160,140,220,0.18);
+  letter-spacing: 0.3px;
+}
+.starfield-toggle:hover {
+  opacity: 1;
+  background: rgba(0,0,0,0.7);
+  box-shadow: 0 0 24px rgba(160,140,220,0.3);
+}
+.starfield-toggle.is-on {
+  background: rgba(255,255,255,0.18);
+  color: #fff8e8;
+  box-shadow: 0 0 20px rgba(255,255,255,0.15);
+}
+.starfield.has-growth .starfield-toggle { display: flex; }
+
+/* Hide toggle button when user is on a light theme — keep it readable. */
+@media (prefers-color-scheme: light) {
+  .starfield-toggle { color: #2a2a3a; background: rgba(255,255,255,0.6); }
+}
+
+/* ─── Shooting-stars layer ─── */
+.starfield-shootings {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* ─── Sky rotation layer ───
+   Wraps the ambient + constellation DOM so a single transform: rotate()
+   produces the daily drift effect. Origin is the wrap centre so the
+   whole celestial sphere rotates around the viewport centre, matching
+   what Earth-bound observers experience. */
+.sky-rotation {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform-origin: 50% 50%;
+  transition: transform 1.2s ease;
+  /* will-change: transform applied only during rotation ticks via JS
+     (applySkyRotation), removed in the next rAF to avoid GPU leak. */
+}
+
+/* ─── Named stars vs ambient ───
+   `named` stars carry `data-star-name` so the hover overlay can read
+   their name + magnitude + HIP catalogue ID. They render slightly
+   brighter and pick up a halo on hover, signalling interactivity. */
+.constellation-stars .star.named {
+  fill: rgba(232, 230, 245, 0.62);
+  cursor: crosshair;
+}
+.constellation-stars .star.named.lit {
+  fill: var(--cn-accent, #ffe2a8);
+  filter:
+    drop-shadow(0 0 6px var(--cn-color, #f4c98a))
+    drop-shadow(0 0 12px var(--cn-accent, #ffe2a8));
+}
+.starfield.detail-mode .constellation-stars .star.named {
+  /* In detail-mode, named stars become interactive. Increase their hit
+     area via a transparent overlay target so hover detection feels natural. */
+  pointer-events: auto;
+}
+.starfield.detail-mode .constellation-stars .star.named:hover {
+  filter:
+    drop-shadow(0 0 9px var(--cn-color, #f4c98a))
+    drop-shadow(0 0 18px var(--cn-accent, #ffe2a8));
+}
+
+/* ─── Constellation label (now two-line: name + metric / progress) ─── */
+.constellation-label {
+  /* existing positioning kept; just allow two stacked lines */
+  padding: 5px 12px 4px;
+  text-align: center;
+  line-height: 1.15;
+}
+.constellation-label .cn-name {
+  display: block;
+  font-family: 'Cormorant Garamond', 'Iowan Old Style', Georgia, serif;
+  font-style: italic;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+.constellation-label .cn-metric {
+  display: block;
+  font-family: var(--font-body, system-ui);
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-top: 2px;
+}
+
+/* ─── Constellation info panel ───
+   Glassmorphism card positioned bottom-right. Lists all 5 constellations
+   with name, latin, metric progress, and color accent. Visible only when
+   detail-mode is on (tied to the ○ toggle in the starfield corner). */
+.constellation-panel {
+  position: fixed;
+  right: 24px;
+  bottom: 70px;
+  z-index: 3;
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  background: rgba(8, 10, 22, 0.82);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: 14px 16px 12px;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.45), 0 0 0 1px rgba(0,0,0,0.12);
+  max-width: 260px;
+  font-family: var(--font-body, system-ui);
+  display: none;
+}
+/* Visibility driven exclusively by JS (renderStarfield populates & toggles
+   inline styles). No CSS-selector based show/hide — avoids dual-control
+   conflicts with the JS-managed display/opacity/transform. */
+.constellation-panel-title {
+  font-family: 'Cormorant Garamond', 'Iowan Old Style', Georgia, serif;
+  font-style: italic;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.7);
+  margin-bottom: 10px;
+  letter-spacing: 0.5px;
+}
+.constellation-panel-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.constellation-panel-row:last-child { border-bottom: none; }
+.constellation-panel-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px currentColor;
+}
+.constellation-panel-info { flex: 1; min-width: 0; }
+.constellation-panel-name {
+  font-family: 'Cormorant Garamond', 'Iowan Old Style', Georgia, serif;
+  font-style: italic;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: rgba(255,255,255,0.85);
+}
+.constellation-panel-metric {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.constellation-panel-progress {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.5);
+  flex-shrink: 0;
+}
+
+/* Light-mode panel */
+@media (prefers-color-scheme: light) {
+  .constellation-panel {
+    background: rgba(255,255,255,0.88);
+    border-color: rgba(0,0,0,0.08);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04);
+  }
+  .constellation-panel-title,
+  .constellation-panel-name { color: rgba(0,0,0,0.75); }
+  .constellation-panel-metric { color: rgba(0,0,0,0.45); }
+  .constellation-panel-progress { color: rgba(0,0,0,0.5); }
+  .constellation-panel-row { border-bottom-color: rgba(0,0,0,0.06); }
+}
+
+/* ─── Light/daytime: disable the entire starfield ───
+   Stars aren't visible on bright backgrounds. Hiding the canvas
+   saves performance. The constellation panel is a SIBLING of
+   #starfield in the HTML (both direct children of body), so it
+   needs its own hide rule. */
+html.theme-light #starfield,
+html.theme-daytime #starfield { display: none !important; }
+html.theme-light #constellation-panel,
+html.theme-daytime #constellation-panel { display: none !important; }
+
+/* ─── Star-info hover overlay ───
+   A single floating tooltip, displayed on pointerenter of any
+   `.constellation-stars .star.named` while `detail-mode` is on.
+   Positioned via `position: fixed` so it escapes transformed
+   ancestors (the `sky-rotation` layer would otherwise drag it with
+   the sky). */
+.star-info-hover {
+  position: fixed;
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  background: rgba(8, 10, 22, 0.88);
+  color: #f6f7ff;
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 10px;
+  padding: 9px 13px 8px;
+  font-family: var(--font-body, system-ui);
+  font-size: 12px;
+  box-shadow:
+    0 8px 24px rgba(0,0,0,0.45),
+    0 0 0 1px rgba(0,0,0,0.12);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  white-space: nowrap;
+  max-width: 280px;
+}
+.star-info-hover.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.star-info-name {
+  font-family: 'Cormorant Garamond', 'Iowan Old Style', Georgia, serif;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.4px;
+  margin-bottom: 3px;
+  color: var(--cn-color, #f6f7ff);
+}
+.star-info-meta {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: rgba(255,255,255,0.62);
+  text-transform: uppercase;
+}
+.star-info-meta2 {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  color: rgba(255,255,255,0.38);
+  margin-top: 2px;
+}
+
+/* Light-mode friendliness for the tooltip + named star styling */
+@media (prefers-color-scheme: light) {
+  .star-info-hover {
+    background: rgba(255,255,255,0.92);
+    color: #1c1f30;
+    border-color: rgba(0,0,0,0.10);
+    box-shadow:
+      0 8px 24px rgba(0,0,0,0.18),
+      0 0 0 1px rgba(0,0,0,0.06);
+  }
+  .star-info-meta { color: rgba(0,0,0,0.55); }
+  .starfield.detail-mode .constellation-stars .star.named {
+    fill: rgba(34, 38, 60, 0.6);
+  }
+  .star-info-meta2 { color: rgba(0,0,0,0.35); }
+}
+
+/* ─── Mobile breakpoint ───
+   Constellations shrink below 800px so they don't overlap. */
+@media (max-width: 800px) {
+  .constellation {
+    transform: translate(-50%, -50%) scale(0.62);
+  }
+  .starfield-toggle { right: 14px; bottom: 14px; }
+}
+
+/* ─── Dawn theme — warm sunrise sky (5am–7am). Stars use dark
+   warm-toned fills against the golden-orange gradient. */
+html.theme-dawn .starfield-ambient .star-ambient {
+  background: #2d1a0c;
+  opacity: 0.52;
+}
+html.theme-dawn .starfield-ambient .star-ambient-interactive {
+  background: var(--sp-tint, #3d2410);
+}
+html.theme-dawn .constellation-stars .star {
+  fill: rgba(40, 22, 10, 0.62);
+}
+html.theme-dawn .constellation-stars .star.named:not(.lit) {
+  fill: color-mix(in srgb, rgba(40, 22, 10, 0.65), var(--sp-tint, #f2f5ff) 25%);
+}
+html.theme-dawn .constellation-stars .star.lit {
+  fill: var(--cn-color, #f59e0b);
+  filter:
+    drop-shadow(0 0 5px var(--cn-color, #f59e0b))
+    drop-shadow(0 0 12px var(--cn-accent, #fbbf24));
+}
+html.theme-dawn .constellation-label {
+  color: #2d1a0c;
+  background: rgba(255,248,240,0.78);
+  border-color: rgba(0,0,0,0.10);
+}
+html.theme-dawn .star-info-hover {
+  background: rgba(255,248,240,0.94);
+  color: #2d1a0c;
+  border-color: rgba(0,0,0,0.10);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05);
+}
+html.theme-dawn .star-info-hover .star-info-meta { color: rgba(0,0,0,0.55); }
+html.theme-dawn .star-info-hover .star-info-meta2 { color: rgba(0,0,0,0.35); }
+
+/* ─── Dusk theme — warm sunset sky (5pm–7pm). Stars use medium-dark
+   fills against the orange-to-purple gradient. */
+html.theme-dusk .starfield-ambient .star-ambient {
+  background: #eee;
+  opacity: 0.5;
+}
+html.theme-dusk .starfield-ambient .star-ambient-interactive {
+  background: var(--sp-tint, #ddd);
+}
+html.theme-dusk .constellation-stars .star {
+  fill: rgba(220, 200, 180, 0.58);
+}
+html.theme-dusk .constellation-stars .star.named:not(.lit) {
+  fill: color-mix(in srgb, rgba(220, 200, 180, 0.62), var(--sp-tint, #f2f5ff) 32%);
+}
+html.theme-dusk .constellation-stars .star.lit {
+  fill: var(--cn-color, #f97316);
+  filter:
+    drop-shadow(0 0 5px var(--cn-color, #f97316))
+    drop-shadow(0 0 12px var(--cn-accent, #fb923c));
+}
+html.theme-dusk .constellation-label {
+  color: #fde8cd;
+  background: rgba(0,0,0,0.55);
+  border-color: rgba(255,255,255,0.10);
+}
+html.theme-dusk .star-info-hover {
+  background: rgba(20, 12, 8, 0.90);
+  color: #fde8cd;
+  border-color: rgba(255,255,255,0.08);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.45), 0 0 0 1px rgba(0,0,0,0.12);
+}
+html.theme-dusk .star-info-hover .star-info-meta { color: rgba(255,255,255,0.5); }
+html.theme-dusk .star-info-hover .star-info-meta2 { color: rgba(255,255,255,0.32); }
+
+/* ─── Daytime theme — stars visible against a blue sky ───
+   Uses darker fills + higher opacity so stars read clearly on the
+   sky-blue background. Constellation colours stay bold.
+   The sky gradient is set inline via applyStarfieldTheme()
+   (THEME_PALETTES.daytime.sky) — inline style has higher
+   specificity than this CSS class. This block only handles
+   star/tooltip appearance. */
+html.theme-daytime .starfield-ambient .star-ambient {
+  background: #1e2330;
+  opacity: 0.58;
+}
+html.theme-daytime .starfield-ambient .star-ambient-interactive {
+  background: var(--sp-tint, #1e2330);
+}
+html.theme-daytime .constellation-stars .star {
+  fill: rgba(24, 28, 44, 0.62);
+}
+html.theme-daytime .constellation-stars .star.named:not(.lit) {
+  fill: color-mix(in srgb, rgba(24, 28, 44, 0.65), var(--sp-tint, #f2f5ff) 30%);
+}
+html.theme-daytime .constellation-stars .star.lit {
+  fill: var(--cn-color, #2563eb);
+  filter:
+    drop-shadow(0 0 5px var(--cn-color, #2563eb))
+    drop-shadow(0 0 12px var(--cn-accent, #3b82f6));
+}
+html.theme-daytime .constellation-label {
+  color: #1a1d2e;
+  background: rgba(255,255,255,0.78);
+  border-color: rgba(0,0,0,0.12);
+}
+html.theme-daytime .star-info-hover {
+  background: rgba(255,255,255,0.92);
+  color: #1c1f30;
+  border-color: rgba(0,0,0,0.10);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06);
+}
+html.theme-daytime .star-info-hover .star-info-meta { color: rgba(0,0,0,0.55); }
+html.theme-daytime .star-info-hover .star-info-meta2 { color: rgba(0,0,0,0.35); }
+
+/* ─── Light theme — crisp black stars against a soft off-white sky.
+   Stars use high-opacity dark fills so they're sharp and unambiguous.
+   Accent is blue (#2563eb). */
+html.theme-light .starfield-ambient .star-ambient {
+  background: #111318;
+  opacity: 0.62;
+}
+html.theme-light .starfield-ambient .star-ambient-interactive {
+  background: var(--sp-tint, #111318);
+}
+html.theme-light .constellation-stars .star {
+  fill: rgba(10, 12, 20, 0.78);
+}
+html.theme-light .constellation-stars .star.named:not(.lit) {
+  fill: color-mix(in srgb, rgba(10, 12, 20, 0.82), var(--sp-tint, #d0d5f0) 22%);
+}
+html.theme-light .constellation-stars .star.lit {
+  fill: var(--cn-color, #2563eb);
+  filter:
+    drop-shadow(0 0 6px var(--cn-color, #2563eb))
+    drop-shadow(0 0 14px var(--cn-accent, #3b82f6));
+}
+html.theme-light .constellation-label {
+  color: #111318;
+  background: rgba(255,255,255,0.88);
+  border-color: rgba(0,0,0,0.08);
+}
+html.theme-light .star-info-hover {
+  background: rgba(255,255,255,0.95);
+  color: #111318;
+  border-color: rgba(0,0,0,0.08);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.14), 0 0 0 1px rgba(0,0,0,0.04);
+}
+html.theme-light .star-info-hover .star-info-meta { color: rgba(0,0,0,0.5); }
+html.theme-light .star-info-hover .star-info-meta2 { color: rgba(0,0,0,0.3); }
+
+/* ─── Light-mode friendliness ───
+   OS-level light mode fallback. When the user's system is set to
+   light mode and no explicit theme is selected, these fill in.
+   html.theme-light rules above take priority when manually selected. */
+@media (prefers-color-scheme: light) {
+  .starfield {
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 30%,
+        rgba(220, 220, 240, 0.55) 0%,
+        rgba(245, 245, 250, 0.30) 40%,
+        rgba(255,255,255,0) 70%);
+  }
+  .starfield-ambient .star-ambient { background: #2a3040; opacity: 0.55; }
+  .starfield-ambient .star-ambient-interactive { background: var(--sp-tint, #2a3040); }
+  .constellation-stars .star { fill: rgba(34, 38, 60, 0.58); }
+  .constellation-stars .star.named:not(.lit) {
+    fill: color-mix(in srgb, rgba(34, 38, 60, 0.58), var(--sp-tint, #f2f5ff) 32%);
+  }
+  .constellation-stars .star.lit {
+    fill: rgba(30, 34, 55, 0.85);
+    filter:
+      drop-shadow(0 0 4px rgba(0,0,0,0.25))
+      drop-shadow(0 0 9px rgba(0,0,0,0.18));
+  }
+  .constellation-label {
+    color: #2a2a3a;
+    background: rgba(255,255,255,0.78);
+    border-color: rgba(0,0,0,0.10);
+  }
+}
+
+/* Confetti canvas must remain above the starfield overlay so
+   per-task confetti still appears. (CSS owns z-index ordering:
+   header-actions=2, confetti=998, flashcard=999. .starfield=0.) */
+/* (handled by source-order in index.html) */
+
+/* ═══════════════════════════════════════════════════════════════
+   TEMPLATES STYLES (kept from before)
+   ═══════════════════════════════════════════════════════════════ */
+.template-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  transition: border-color var(--transition, 0.2s ease);
+}
+.template-item:hover { border-color: var(--accent); }
+.template-info { flex: 1; cursor: pointer; min-width: 0; }
+.template-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.template-meta { display: flex; gap: 6px; flex-wrap: wrap; }
+.template-tag {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--bg3, #1a1b2e);
+  color: var(--text3);
+  font-weight: 600;
+}
