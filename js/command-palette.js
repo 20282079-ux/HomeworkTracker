@@ -16,7 +16,6 @@ var COMMANDS = [
   // ── Tasks ──
   { id: 'add-task',    label: 'Add Task',              category: 'Tasks',      icon: '＋', shortcut: 'N', action: function() { App.openAddForm(); } },
   { id: 'add-test',    label: 'Add Test',              category: 'Tests',      icon: '🧪', shortcut: '',  action: function() { App.openTestForm(); } },
-  { id: 'quick-add',   label: 'Quick Add',             category: 'Tasks',      icon: '⚡', shortcut: 'Q', action: function() { var qa = document.getElementById('qa-input'); if (qa) { qa.focus(); qa.select(); } } },
   { id: 'search-tasks',label: 'Search Tasks',          category: 'Tasks',      icon: '🔍', shortcut: '',  action: function() { App.switchTab('hw'); setTimeout(function() { var s = document.getElementById('search-input'); if (s) s.focus(); }, 50); } },
 
   // ── View ──

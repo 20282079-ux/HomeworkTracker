@@ -88,7 +88,7 @@ function filterTasks() {
       const gh = document.createElement('div');
       gh.className = 'group-header';
       const subj = subjects.find(s => s.name === sub);
-      gh.innerHTML = `<span style="color:${subj ? subj.color : '#fff'}">${sub}</span> <span style="opacity:.4">(${items.length})</span>`;
+      gh.innerHTML = `<span style="color:${escHtml(subj ? subj.color : '#fff')}">${escHtml(sub)}</span> <span style="opacity:.4">(${items.length})</span>`;
       container.appendChild(gh);
       items.forEach((t,i) => container.appendChild(buildCard(t, i)));
     });
@@ -122,7 +122,7 @@ function buildCard(t, index) {
   }
 
   const timeBadge = t.time ? `<span class="badge badge-due">⏱ ${t.time}m</span>` : '';
-  const recurBadge = t.recurring ? `<span class="badge badge-recurring">🔁 ${t.recurring}</span>` : '';
+  const recurBadge = t.recurring ? `<span class="badge badge-recurring">🔁 ${escHtml(t.recurring)}</span>` : '';
   const statusBadge = t.status === 'in-progress' ? `<span class="badge" style="background:rgba(96,165,250,.15);color:#60a5fa;border-color:rgba(96,165,250,.3)">In Progress</span>` : '';
 
   // Streak badge for daily tasks
@@ -139,17 +139,17 @@ function buildCard(t, index) {
   card.className = `task-card${isDone ? ' done' : ''}${isOverdue ? ' overdue' : ''}${isSoon && !isOverdue ? ' due-soon' : ''}${compactMode ? ' compact' : ''}${pinnedClass}`;
 
   card.innerHTML = `
-    <div class="task-strip" style="background:${subj.color}"></div>
-    <button class="star-btn${t.pinned ? ' starred' : ''}" onclick="togglePin('${t.id}')" title="${t.pinned ? 'Unpin' : 'Pin task'}">${t.pinned ? '⭐' : '☆'}</button>
-    <div class="task-checkbox${isDone ? ' checked' : ''}" onclick="toggleDone('${t.id}')">
+    <div class="task-strip" style="background:${escHtml(subj.color)}"></div>
+    <button class="star-btn${t.pinned ? ' starred' : ''}" onclick="togglePin('${escJsAttr(t.id)}')" title="${t.pinned ? 'Unpin' : 'Pin task'}">${t.pinned ? '⭐' : '☆'}</button>
+    <div class="task-checkbox${isDone ? ' checked' : ''}" onclick="toggleDone('${escJsAttr(t.id)}')">
       <svg width="12" height="9" viewBox="0 0 12 9" fill="none"><path d="M1 4L4.5 7.5L11 1" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </div>
     <div class="task-body">
       <div class="task-title">${escHtml(t.title)}</div>
       ${t.notes ? `<div class="task-note">${escHtml(t.notes)}</div>` : ''}
       <div class="task-meta">
-        <span class="badge" style="background:${hexToRgba(subj.color,.15)};color:${subj.color};border-color:${hexToRgba(subj.color,.3)}">${escHtml(t.subject)}</span>
-        <span class="badge badge-priority-${t.priority}">${t.priority}</span>
+        <span class="badge" style="background:${hexToRgba(subj.color,.15)};color:${escHtml(subj.color)};border-color:${hexToRgba(subj.color,.3)}">${escHtml(t.subject)}</span>
+        <span class="badge badge-priority-${escHtml(t.priority)}">${escHtml(t.priority)}</span>
         ${statusBadge}
         ${dueBadge}
         ${timeBadge}
@@ -159,8 +159,8 @@ function buildCard(t, index) {
       </div>
     </div>
     <div class="task-actions">
-      <button class="task-act-btn edit" onclick="openEdit('${t.id}')" title="Edit">✎</button>
-      <button class="task-act-btn del" onclick="deleteTask('${t.id}')" title="Delete">✕</button>
+      <button class="task-act-btn edit" onclick="openEdit('${escJsAttr(t.id)}')" title="Edit">✎</button>
+      <button class="task-act-btn del" onclick="deleteTask('${escJsAttr(t.id)}')" title="Delete">✕</button>
     </div>
   `;
   return card;

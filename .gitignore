@@ -1,0 +1,17 @@
+# Dependencies (installed, never committed — platform-specific native binaries)
+node_modules/
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.swp
+*.log
+
+# Local tooling output
+.vite/
+coverage/
+dist/
+
+# Environment secrets
+.env
+.env.local

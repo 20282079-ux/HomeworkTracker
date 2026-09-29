@@ -20,7 +20,32 @@ let activeFilter = 'All';
 let editingId = null;
 let compactMode = false;
 
-// PRIORITIES and PRIO_WEIGHT are defined in calendar.js (extracted from app.js)
+// Priority levels, lowest → highest weight. PRIO_WEIGHT drives priority
+// sorting in tasks.js; 'Low'…'Urgent' are also the CSS classes
+// .badge-priority-Low … .badge-priority-Urgent in styles.css.
+var PRIORITIES = ['Low', 'Medium', 'High', 'Urgent'];
+var PRIO_WEIGHT = { 'Low': 1, 'Medium': 2, 'High': 3, 'Urgent': 4 };
+
+// ═══════════════════════════════════════
+//  LEGACY KEY CLEANUP
+// ═══════════════════════════════════════
+// The quick-add bar, the course-synonym editor and the voice/AI assistant were
+// removed from the app, so nothing reads these keys any more. Drop them once on
+// load so an existing install doesn't carry orphaned data — and stale API keys
+// — around forever.
+var LEGACY_STORAGE_KEYS = [
+  'hw_quickadd_history',  // quick-add suggestions/history
+  'hw_custom_synonyms',   // custom term → course mappings
+  'hw_ai_provider',       // voice provider selection
+  'hw_ai_model',          // voice model selection
+  'hw_openrouter_key',    // voice API key
+  'hw_gemini_key',        // voice API key
+];
+function purgeLegacyKeys() {
+  LEGACY_STORAGE_KEYS.forEach(function(k) {
+    try { localStorage.removeItem(k); } catch (e) { /* storage blocked — nothing to clean */ }
+  });
+}
 
 // ═══════════════════════════════════════
 //  STORAGE
@@ -33,6 +58,7 @@ function save() {
 }
 
 function load() {
+  purgeLegacyKeys();
   const t = localStorage.getItem('hw_tasks');
   const s = localStorage.getItem('hw_subjects');
   const cfg = localStorage.getItem('hw_settings');
@@ -71,7 +97,7 @@ function load() {
   // First-run welcome tip — shown once, dismissible via localStorage flag.
   if (isFirstRun && typeof toast === 'function') {
     setTimeout(function() {
-      toast('👋 Welcome! Type in the quick-add bar, e.g. "math homework due friday 30m". Click ⌨ Shortcuts for keyboard tips.', '', 8000);
+      toast('👋 Welcome! Hit ＋ Add Task to create your first assignment. Click ⌨ Shortcuts for keyboard tips.', '', 8000);
     }, 800);
   }
 }

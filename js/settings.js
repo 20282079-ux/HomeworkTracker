@@ -1,9 +1,7 @@
-// 6-settings.js (split from app.js) — settings modal, subjects CRUD, exports, course synonyms
+// 6-settings.js (split from app.js) — settings modal, subjects CRUD, exports
 function openSettings() {
   renderSubjectList();
   syncColorInputs();
-  populateSynonymSelect();
-  renderSynonymList();
   renderTemplateList();
   // Sync the sound-toggle checkbox on settings open so it reflects the
   // current persisted state (defaulting to ON if never set).
@@ -18,34 +16,6 @@ function openSettings() {
   // Sync auto-theme toggle to reflect persisted localStorage state.
   var autoThemeEl = document.getElementById('s-auto-theme');
   if (autoThemeEl) { try { autoThemeEl.checked = localStorage.getItem('hw_auto_theme') === '1'; } catch(e) { /* localStorage may be full or disabled */ } }
-  // Populate AI provider, model, and keys from localStorage.
-  if (typeof Voice !== 'undefined') {
-    var provEl = document.getElementById('s-ai-provider');
-    if (provEl) provEl.value = Voice.getProvider();
-    var modelEl = document.getElementById('s-ai-model');
-    if (modelEl) {
-      // Populate model dropdown based on current provider
-      var models = Voice.getProvider() === 'openrouter' ? Voice.OPENROUTER_MODELS : Voice.GEMINI_MODELS;
-      modelEl.innerHTML = '';
-      models.forEach(function(m) {
-        var opt = document.createElement('option');
-        opt.value = m;
-        opt.textContent = m;
-        modelEl.appendChild(opt);
-      });
-      modelEl.value = Voice.getModel();
-    }
-    var orKeyEl = document.getElementById('s-openrouter-key');
-    if (orKeyEl) orKeyEl.value = Voice.getOpenRouterKey();
-    var gemKeyEl = document.getElementById('s-gemini-key');
-    if (gemKeyEl) gemKeyEl.value = Voice.getGeminiKey();
-    // Show/hide key fields based on provider
-    var prov = Voice.getProvider();
-    var orDiv = document.getElementById('ai-key-openrouter');
-    var gemDiv = document.getElementById('ai-key-gemini');
-    if (orDiv) orDiv.style.display = (prov === 'openrouter') ? '' : 'none';
-    if (gemDiv) gemDiv.style.display = (prov === 'gemini') ? '' : 'none';
-  }
   document.getElementById('settings-modal').classList.remove('hidden');
 }
 function closeSettings() { document.getElementById('settings-modal').classList.add('hidden'); save(); }
@@ -144,9 +114,9 @@ function renderSubjectList() {
     const div = document.createElement('div');
     div.className = 'subject-item';
     div.innerHTML = `
-      <div class="subject-dot" style="background:${s.color}"></div>
-      <input type="text" id="subj-name-${i}" name="subj-name-${i}" value="${escHtml(s.name)}" onchange="subjects[${i}].name=this.value;renderFilterChips();populateSubjectSelects();filterTasks();populateSynonymSelect();renderSynonymList()" />
-      <input type="color" id="subj-color-${i}" name="subj-color-${i}" value="${s.color}" oninput="subjects[${i}].color=this.value;renderSubjectList();renderFilterChips();filterTasks()" title="Color" />
+      <div class="subject-dot" style="background:${escHtml(s.color)}"></div>
+      <input type="text" id="subj-name-${i}" name="subj-name-${i}" value="${escHtml(s.name)}" onchange="subjects[${i}].name=this.value;renderFilterChips();populateSubjectSelects();filterTasks()" />
+      <input type="color" id="subj-color-${i}" name="subj-color-${i}" value="${escHtml(s.color)}" oninput="subjects[${i}].color=this.value;renderSubjectList();renderFilterChips();filterTasks()" title="Color" />
       <button class="task-act-btn del" onclick="removeSubject(${i})" title="Remove">✕</button>
     `;
     container.appendChild(div);
@@ -164,9 +134,6 @@ function addSubject() {
   save();
   render();
   renderSubjectList();
-  populateSynonymSelect();
-  renderSynonymList();
-  if (typeof App !== 'undefined' && App.buildAndExtendCompromisePlugin) App.buildAndExtendCompromisePlugin();
   toast(`Subject "${name}" added ✓`, 'success');
 }
 
@@ -176,9 +143,6 @@ function removeSubject(i) {
   save();
   render();
   renderSubjectList();
-  populateSynonymSelect();
-  renderSynonymList();
-  if (typeof App !== 'undefined' && App.buildAndExtendCompromisePlugin) App.buildAndExtendCompromisePlugin();
 }
 
 function populateSubjectSelects() {
@@ -192,246 +156,6 @@ function populateSubjectSelects() {
   // also refresh test modal subject select if open
   populateTestSubjectSelect(document.getElementById('t-subject')?.value);
 }
-
-// ═══════════════════════════════════════
-var COURSE_CATEGORIES = {
-  'history': [
-    'history','hist','social studies','government','gov','us history','american history',
-    'world history','world','civics','polisci','political science','apush',
-    'euro','european history','us gov','american gov','comp gov','comparative government',
-    'human geo','human geography','ap human','macro','micro','economics','econ',
-    'ap gov','ap world','ap euro','ap world history','ap us history','ap european',
-    'ap government','honors history'
-  ],
-  'english': [
-    'english','eng','ela','language arts','writing','literature','lit',
-    'ap seminar','seminar','composition','comp','rhetoric','speech',
-    'lang','ap lang','ap lit','ap language','ap literature',
-    'honors english','honors lit','creative writing','journalism',
-    'english lang','english lit','english language','ap english',
-    'honors language'
-  ],
-  'math': [
-    'math','mathematics','algebra','geometry','calculus','calc',
-    'trig','trigonometry','stats','statistics','precalc','precalculus',
-    'arith','arithmetic','ap calc','ap stats','calc ab','calc bc',
-    'ap calculus','ap statistics','honors math','honors calc','honors precalc',
-    'algebra 1','algebra 2','algebra i','algebra ii',
-    'maths','mathe'
-  ],
-  'science': [
-    'science','chem','chemistry','bio','biology','physics','phys',
-    'earth science','environmental science','enviro','lab science',
-    'ap bio','ap chem','ap physics','ap environmental','ap enviro',
-    'ap biology','ap chemistry','honors bio','honors chem','honors physics',
-    'anatomy','physiology','astronomy','marine bio','marine biology',
-    'ap science','honors science','ap environmental science'
-  ],
-  'engineering': [
-    'engineering','engineer','engr','design','tech','technology','robotics',
-    'ap engineering','honors engineering'
-  ],
-  'hebrew': ['hebrew','jewish','judaic','judaica','tanakh','torah'],
-  'sociology': [
-    'sociology','soc','social science','psychology','psych','psy',
-    'ap psych','ap psychology','ap soc','ap sociology',
-    'honors psych','honors sociology'
-  ],
-  'art': [
-    'art','music','band','choir','photography','drama','theater','theatre',
-    'film','media','photo','sketch','painting','drawing','craft',
-    'ap art','ap music','ap studio','ap drawing','ap studio art',
-    'ap 2d','ap 3d','orchestra','chorus','honors art',
-    'ceramics','sculpture','digital art','graphic design'
-  ],
-  'pe': [
-    'pe','health','gym','physical education','fitness','sports','athletics',
-    'wellness','honors pe'
-  ],
-  'cs': [
-    'cs','computer science','programming','coding','python','javascript','java','web dev',
-    'ap cs','compsci','comp sci','apcsa','apcsp','ap computer science','ap comp sci',
-    'honors cs','computer programming'
-  ],
-  'language': [
-    'spanish','french','latin','german','mandarin','chinese','japanese','korean',
-    'language','foreign language','lote',
-    'ap spanish','ap french','ap latin','ap chinese','ap japanese','ap german',
-    'honors spanish','honors french','asl','sign language','american sign language','italian'
-  ],
-};
-
-var CATEGORY_TYPOS = {
-  'history': [
-    'histoy','histry','histroy','hisotry','hitsory',
-    'apushs','goverment','governemnt','govermnent',
-    'econmics','econimcs','macroecon','microecon'
-  ],
-  'english': [
-    'englsih','englsh','engish','englih','enlgish','englihs',
-    'langauge','langugae','langage','languge','langguage',
-    'litrature','literture','literatue','seminar'
-  ],
-  'math': [
-    'algebr','algebraa','aplgebra','algebrs','algeba','algebgra',
-    'algerba','algbera','maths','matn','mathe',
-    'clac','clculus','calclus','calulus','calclulus',
-    'trigonmetry','trigonomtry','trignometry',
-    'precal','precalclus','precalcus'
-  ],
-  'science': [
-    'chemsitry','chemsitr','chemstry','chemestry','chemstiry',
-    'biolgy','biolgoy','biolog','bioloy','bilogy',
-    'phyiscs','phisics','phsyics','physcis',
-    'scinece','sciense','sciecne','scence'
-  ],
-  'sociology': [
-    'sociolgy','socioloy','socilogy','psycholgy','psycholoy',
-    'psycholgoy','psycology','pscyhology','pshychology'
-  ],
-  'hebrew': ['hebrw','hebrow','hebrwe'],
-  'engineering': [
-    'enginering','engineerng','engineeing','engnieering',
-    'engneering','enginerring','engneer'
-  ],
-  'cs': [
-    'cmputer','cmoputer','coputer','comptuer',
-    'progamming','progrmaming','progam','programing'
-  ],
-  'language': [
-    'spanich','spansih','spnaish',
-    'frenhc','frensh','frnech',
-    'german','germna','geramn'
-  ],
-};
-
-// ── Helper: check if a multi-word term matches a subject name ──
-// Returns true if every word in `term` appears as a substring in `subjectName`
-// (words can be non-contiguous, e.g. "ap lang" matches "ap english language").
-// Single-word terms fall through to the standard indexOf check.
-function _termMatchesSubject(term, subjectName) {
-  if (subjectName === term) return true;
-  if (subjectName.length >= 3 && subjectName.indexOf(term) >= 0) return true;
-  if (term.length >= 4 && term.startsWith(subjectName)) return true;
-  // Multi-word term: check if ALL words appear somewhere in subject name.
-  // e.g. "ap lang" → words ["ap","lang"] → both in "ap english language" ✓
-  var termWords = term.split(/\s+/);
-  if (termWords.length >= 2) {
-    for (var w = 0; w < termWords.length; w++) {
-      if (subjectName.indexOf(termWords[w]) === -1) return false;
-    }
-    return true;
-  }
-  return false;
-}
-
-function buildSubjectSynonyms() {
-  var synonyms = {};
-  for (var category in COURSE_CATEGORIES) {
-    var categoryTerms = COURSE_CATEGORIES[category];
-    var matchedSubject = null;
-    for (var i = 0; i < subjects.length; i++) {
-      var subLower = subjects[i].name.toLowerCase();
-      for (var j = 0; j < categoryTerms.length; j++) {
-        var term = categoryTerms[j];
-        if (_termMatchesSubject(term, subLower)) {
-          matchedSubject = subjects[i].name;
-          break;
-        }
-      }
-      if (matchedSubject) break;
-    }
-    if (matchedSubject) {
-      for (var k = 0; k < categoryTerms.length; k++) {
-        synonyms[categoryTerms[k]] = matchedSubject;
-      }
-      var typos = CATEGORY_TYPOS[category];
-      if (typos) {
-        for (var t = 0; t < typos.length; t++) {
-          synonyms[typos[t]] = matchedSubject;
-        }
-      }
-    }
-  }
-  var customSyns = getCustomSynonyms();
-  for (var cs in customSyns) {
-    synonyms[cs] = customSyns[cs];
-  }
-  return synonyms;
-}
-
-function getCustomSynonyms() {
-  try { var data = localStorage.getItem('hw_custom_synonyms'); return data ? JSON.parse(data) : {}; } catch(e) { return {}; /* corrupted data — reset to empty */ }
-}
-function saveCustomSynonyms(syns) { localStorage.setItem('hw_custom_synonyms', JSON.stringify(syns)); }
-function addCustomSynonym(synonym, subjectName) {
-  var syns = getCustomSynonyms(); syns[synonym.toLowerCase()] = subjectName; saveCustomSynonyms(syns);
-}
-function removeCustomSynonym(synonym) {
-  var syns = getCustomSynonyms(); delete syns[synonym.toLowerCase()]; saveCustomSynonyms(syns);
-}
-function renderSynonymList() {
-  var container = document.getElementById('synonym-list');
-  if (!container) return;
-  container.innerHTML = '';
-  var customSyns = getCustomSynonyms();
-  var keys = Object.keys(customSyns).sort();
-  if (keys.length === 0) {
-    var hint = document.createElement('div');
-    hint.style.cssText = 'color:var(--text3);font-size:13px;padding:8px 0';
-    hint.textContent = 'No custom synonyms yet. Add below to map terms to courses.';
-    container.appendChild(hint);
-    return;
-  }
-  keys.forEach(function(syn) {
-    var div = document.createElement('div');
-    div.style.cssText = 'display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px';
-    var label = document.createElement('span');
-    label.style.cssText = 'color:var(--text2);flex:1';
-    label.textContent = '"' + syn + '"';
-    div.appendChild(label);
-    var arrow = document.createElement('span');
-    arrow.style.cssText = 'color:var(--text3);font-size:12px';
-    arrow.textContent = '→';
-    div.appendChild(arrow);
-    var target = document.createElement('span');
-    target.style.cssText = 'color:var(--accent);flex:1';
-    target.textContent = customSyns[syn];
-    div.appendChild(target);
-    var btn = document.createElement('button');
-    btn.className = 'task-act-btn del';
-    btn.title = 'Remove';
-    btn.textContent = '✕';
-    (function(s) { btn.onclick = function() { removeCustomSynonym(s); renderSynonymList(); }; })(syn);
-    div.appendChild(btn);
-    container.appendChild(div);
-  });
-}
-function populateSynonymSelect() {
-  var sel = document.getElementById('new-synonym-target');
-  if (!sel) return;
-  sel.innerHTML = '';
-  subjects.forEach(function(s) {
-    var opt = document.createElement('option');
-    opt.value = s.name;
-    opt.textContent = s.name;
-    sel.appendChild(opt);
-  });
-}
-
-function addSynonymFromUI() {
-  var termEl = document.getElementById('new-synonym-term');
-  var targetEl = document.getElementById('new-synonym-target');
-  if (!termEl || !targetEl) return;
-  var term = termEl.value.trim().toLowerCase();
-  var target = targetEl.value;
-  if (!term || !target) { if (termEl) termEl.focus(); return; }
-  addCustomSynonym(term, target);
-  termEl.value = '';
-  renderSynonymList();
-  toast('Synonym "' + term + '" → ' + target + ' added', 'success');
-}
-
 
 function exportCSV() {
   const header = ['Title','Subject','Priority','Status','Due Date','Est. Time (min)','Notes','Recurring'];
@@ -490,6 +214,3 @@ function exportICS() {
   URL.revokeObjectURL(url);
   toast('Exported ' + pending.length + ' events to Google Calendar ✓', 'success');
 }
-
-
-

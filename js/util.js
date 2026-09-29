@@ -16,7 +16,12 @@ function toast(msg, type, ms) {
   const el = document.createElement('div');
   el.className = `toast ${type}`;
   const icons = { success: '✅', error: '❌', '': 'ℹ️' };
-  el.innerHTML = `<span>${icons[type]||'ℹ️'}</span> ${msg}`;
+  // Built from DOM nodes rather than innerHTML: toast messages routinely
+  // embed user-supplied text (subject names, task titles).
+  const icon = document.createElement('span');
+  icon.textContent = icons[type] || 'ℹ️';
+  el.appendChild(icon);
+  el.appendChild(document.createTextNode(' ' + msg));
   document.getElementById('toast-container').appendChild(el);
   setTimeout(() => el.remove(), duration);
 }
@@ -53,6 +58,14 @@ function launchConfetti() {
 
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// Escape a value for a JS string literal that is itself embedded in an HTML
+// attribute, e.g. onclick="doThing('VALUE')". escHtml() alone is NOT enough
+// there: the HTML parser decodes entities before the JS engine parses the
+// string, so an embedded quote would still break out of the literal.
+function escJsAttr(s) {
+  return escHtml(String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
 }
 
 // ── Global error barrier: catches unhandled errors in event handlers and

@@ -1208,7 +1208,6 @@ function renderStarfield() {
 function notifyStarfieldGrowth(_metricIgnored) { renderStarfield(); }
 function notifyTreeGrowth()   { renderStarfield(); }
 function notifyTreeDeletion() { renderStarfield(); }
-function syncForestMetricsFromApp(_appCounts) { renderStarfield(); }
 
 function toggleStarfieldDetail() {
   var state = getStarfieldState();
@@ -1387,7 +1386,6 @@ function playTone(freq, type, duration, vol) {
   osc.connect(gain); gain.connect(ctx.destination);
   osc.start(); osc.stop(ctx.currentTime + duration);
 }
-function playSuccess() { if (!_soundEnabled) return; playTone(523.25,'sine',.12,.08); setTimeout(function(){ playTone(659.25,'sine',.12,.08); }, 80); }
 function playClick()   { if (!_soundEnabled) return; playTone(600,'sine',.03,.05); }
 
 // ═══════════════════════════════════════

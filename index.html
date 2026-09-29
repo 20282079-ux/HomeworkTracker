@@ -3,7 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval'; font-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://cdn.jsdelivr.net https://generativelanguage.googleapis.com https://openrouter.ai; img-src 'self' data:;" />
+  <!-- 'unsafe-inline' is still required by the inline onclick handlers.
+       base-uri/object-src/worker-src are locked down, and no third-party
+       script or network origin is allowed — everything but Google Fonts is
+       self-hosted. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; font-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'; worker-src 'self'; connect-src 'self'; img-src 'self' data:;" />
   <title>Homework Tracker</title>
 
   <!-- PWA Meta -->
@@ -14,7 +18,7 @@
   <meta name="apple-mobile-web-app-title" content="HW Tracker" />
   <meta name="description" content="Track your assignments and tests with style — a beautiful, offline-ready homework planner" />
   <link rel="manifest" href="/manifest.json" />
-  <link rel="apple-touch-icon" href="/icon.svg" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📚</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -46,7 +50,7 @@
         <p class="header-sub" id="header-sub">Track your assignments with style</p>
       </div>
       <nav class="header-actions" aria-label="App actions">
-        <button class="btn btn-ghost btn-sm" onclick="App.showKeybindsHelp()" id="keybinds-hint-btn" title="Keyboard shortcuts: hold F for focus mode, N for night sky, Q to focus quick-add, Esc to close" aria-label="Keyboard shortcuts help">⌨ Shortcuts</button>
+        <button class="btn btn-ghost btn-sm" onclick="App.showKeybindsHelp()" id="keybinds-hint-btn" title="Keyboard shortcuts: hold F for focus mode, N for night sky, Esc to close" aria-label="Keyboard shortcuts help">⌨ Shortcuts</button>
         <button class="btn btn-ghost btn-sm" onclick="App.toggleCompact()" id="compact-btn" title="Toggle compact view" aria-pressed="false">⊟ Compact</button>
         <button class="btn btn-ghost btn-sm" onclick="App.openSettings()" title="Customize settings">⚙ Customize</button>
         <button class="btn btn-primary" onclick="App.openAddForm()" id="add-btn">＋ Add Task</button>
@@ -95,24 +99,6 @@
             <div class="progress-fill" id="progress-fill" style="width:0%"></div>
           </div>
         </div>
-
-        <!-- Quick-Add Bar -->
-        <div class="quick-add-bar" role="group" aria-label="Quick add assignment">
-          <button class="voice-mic-btn" id="voice-mic-btn" onclick="Voice.toggle()" aria-label="Voice input" title="Click to speak your assignment">
-            <svg class="mic-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
-              <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
-              <line x1="12" x2="12" y1="19" y2="22"/>
-            </svg>
-            <span class="voice-pulse-ring"></span>
-          </button>
-          <input type="text" id="qa-input" class="quick-add-input" placeholder="Quick add: e.g. Math homework due Friday 30m high" oninput="App.onQuickAddInput(event)" onkeydown="App.onQuickAddKeydown(event)" onblur="scheduleHideSuggestions()" role="combobox" aria-expanded="false" aria-controls="qa-suggestions" aria-autocomplete="list" aria-label="Quick add assignment" />
-          <button class="btn btn-primary btn-sm" onclick="App.confirmQuickAdd()" aria-label="Add task">＋ Add</button>
-        </div>
-        <div id="qa-suggestions" class="qa-suggestions hidden" role="listbox" aria-label="Quick add suggestions"></div>
-        <!-- qa-history removed per user request; kept as a hidden sentinel so legacy code paths don't crash -->
-        <div id="qa-history" class="qa-history" style="display:none" aria-hidden="true" aria-label="(Removed: recent quick-add entries)"></div>
-        <div id="qa-preview" class="qa-preview hidden" aria-live="off"></div>
 
         <!-- Toolbar -->
         <div class="toolbar" role="search" aria-label="Filter and search assignments">
@@ -192,8 +178,6 @@
         <div id="tests-list" class="tasks-list" role="list" aria-label="Tests"></div>
 
       </section>
-
-      <!-- Calendar + Grade-Calculator panels removed per user request. -->
 
     </main>
   </div>
@@ -354,72 +338,12 @@
           <button class="btn btn-primary btn-sm" onclick="App.addSubject()">Add</button>
         </div>
       </div>
-        <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">
-          <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">⚙ Custom Synonyms</div>
-          <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Map custom terms to courses. These are used by the quick-add parser.</div>
-          <div id="synonym-list"></div>
-          <div class="add-subject-row" style="margin-top:10px;gap:8px;display:flex">
-            <input type="text" id="new-synonym-term" placeholder="Term to map…"
-              style="flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-family:var(--font-body);font-size:13px;outline:none" />
-            <span style="color:var(--text3);font-size:12px">→</span>
-            <select id="new-synonym-target" style="flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-family:var(--font-body);font-size:13px;outline:none"></select>
-            <button class="btn btn-primary btn-sm" onclick="App.addSynonymFromUI()">Add</button>
-          </div>
-        </div>
-      
 
       <!-- Templates -->
       <div class="settings-section">
         <h3 class="settings-section-title">📋 Templates</h3>
         <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Click a template to auto-fill the task form. Save your own from the task modal.</div>
         <div id="template-list"></div>
-      </div>
-
-      <!-- Data & Export -->
-      <div class="settings-section">
-        <h3 class="settings-section-title">🤖 AI Voice Parser</h3>
-
-        <!-- Provider selector -->
-        <div class="field" style="margin-bottom:10px">
-          <label for="s-ai-provider">AI Provider</label>
-          <select id="s-ai-provider" onchange="Voice.setProvider(this.value);App._refreshAISettings()" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-family:var(--font-body);font-size:13px;outline:none">
-            <option value="openrouter">OpenRouter (recommended — many free models)</option>
-            <option value="gemini">Google Gemini (native API)</option>
-          </select>
-        </div>
-
-        <!-- Model selector -->
-        <div class="field" style="margin-bottom:8px">
-          <label for="s-ai-model">Model</label>
-          <select id="s-ai-model" onchange="Voice.setModel(this.value)" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-family:var(--font-body);font-size:13px;outline:none">
-            <!-- populated dynamically by _refreshAISettings -->
-          </select>
-        </div>
-
-        <!-- OpenRouter key -->
-        <div id="ai-key-openrouter" class="field" style="margin-bottom:8px">
-          <label for="s-openrouter-key">OpenRouter API Key</label>
-          <div style="font-size:12px;color:var(--text3);margin-bottom:4px">Get a free key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">openrouter.ai/keys</a></div>
-          <div style="display:flex;gap:8px">
-            <input type="password" id="s-openrouter-key" placeholder="sk-or-..." value="" onchange="Voice.setOpenRouterKey(this.value)" style="flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-family:var(--font-body);font-size:13px;outline:none" />
-            <button class="btn btn-ghost btn-sm" onclick="var el=document.getElementById('s-openrouter-key');el.type=el.type==='password'?'text':'password';this.textContent=el.type==='password'?'👁':'🙈'" title="Show/hide key" style="flex-shrink:0;min-width:44px" aria-label="Toggle API key visibility">👁</button>
-          </div>
-        </div>
-
-        <!-- Gemini key -->
-        <div id="ai-key-gemini" class="field" style="margin-bottom:8px">
-          <label for="s-gemini-key">Gemini API Key</label>
-          <div style="font-size:12px;color:var(--text3);margin-bottom:4px">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">Google AI Studio</a></div>
-          <div style="display:flex;gap:8px">
-            <input type="password" id="s-gemini-key" placeholder="AIza..." value="" onchange="Voice.setGeminiKey(this.value)" style="flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-family:var(--font-body);font-size:13px;outline:none" />
-            <button class="btn btn-ghost btn-sm" onclick="var el=document.getElementById('s-gemini-key');el.type=el.type==='password'?'text':'password';this.textContent=el.type==='password'?'👁':'🙈'" title="Show/hide key" style="flex-shrink:0;min-width:44px" aria-label="Toggle API key visibility">👁</button>
-          </div>
-        </div>
-
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
-          <button class="btn btn-ghost btn-sm" onclick="Voice.setOpenRouterKey('');Voice.setGeminiKey('');document.getElementById('s-openrouter-key').value='';document.getElementById('s-gemini-key').value='';if(typeof toast==='function')toast('API keys cleared','',2000)">🗑 Clear Keys</button>
-          <span style="font-size:11px;color:var(--text3);align-self:center">Free tier • Keys stay on your device</span>
-        </div>
       </div>
 
       <!-- Data & Export -->
@@ -491,7 +415,6 @@
 
       <div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap">
         <button class="btn btn-danger btn-sm" onclick="App.clearAllTasks()">🗑 Clear All Tasks</button>
-        <button class="btn btn-ghost btn-sm" onclick="App.clearQuickAddHistory()">🧹 Clear Suggestions</button>
         <div style="display:flex;gap:8px">
           <button class="btn btn-ghost btn-sm" onclick="App.resetSettings()">↺ Reset Theme</button>
           <button class="btn btn-primary" onclick="App.closeSettings()">Done</button>
@@ -681,32 +604,15 @@
     </div>
   </div>
 
-  <!-- ═══ CHRONO-NODE (date parsing) via CDN ESM ═══ -->
-  <script type="importmap">
-    { "imports": { "chrono-node": "https://cdn.jsdelivr.net/npm/chrono-node@2.9.1/dist/esm/index.js" } }
-  </script>
-  <script type="module">
-    import * as chrono from 'chrono-node';
-    window.chrono = chrono;
-  </script>
-
-  <!-- ═══ COMPROMISE.JS (NLP: POS tagging, noun phrases, numbers, adjectives) via CDN ═══ -->
-  <script src="https://cdn.jsdelivr.net/npm/compromise@14/builds/compromise.min.js"></script>
-
   <!-- ═══ MODULAR JS LOAD ORDER ═══ -->
   <script src="js/gamification.js"></script>
   <script src="js/devmode.js"></script>
   <script src="js/state.js"></script>
   <script src="js/util.js"></script>
-  <script src="js/quickadd.js"></script>
   <script src="js/tasks.js"></script>
   <script src="js/tests.js"></script>
   <script src="js/settings.js"></script>
   <script src="js/command-palette.js"></script>
-  <script src="js/parser.js"></script>
-  <script src="js/calendar.js"></script>
-  <script src="js/gradecalc.js"></script>
-  <script src="js/voice.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

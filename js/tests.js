@@ -1,4 +1,4 @@
-// 5-tests.js (split from app.js) — test tracker + countdown + grade chart + GPA + study timer + flashcards
+// 5-tests.js (split from app.js) — test tracker + countdown + flashcards
 function seedSampleTests() {
   const add = n => { const d = new Date(); d.setDate(d.getDate()+n); return d.toISOString().split('T')[0]; };
   tests = [
@@ -106,7 +106,7 @@ function buildTestCard(t, index) {
     else dateBadge = `<span class="badge badge-due">📅 ${formatDate(t.date)}</span>`;
   }
 
-  const typeBadge = `<span class="badge" style="background:${hexToRgba(subj.color,.15)};color:${subj.color};border-color:${hexToRgba(subj.color,.3)}">${escHtml(t.type||'Test')}</span>`;
+  const typeBadge = `<span class="badge" style="background:${hexToRgba(subj.color,.15)};color:${escHtml(subj.color)};border-color:${hexToRgba(subj.color,.3)}">${escHtml(t.type||'Test')}</span>`;
   const subjectBadge = `<span class="badge badge-due">${escHtml(t.subject)}</span>`;
 
   let scoreDisplay = '';
@@ -118,7 +118,7 @@ function buildTestCard(t, index) {
   }
 
   card.innerHTML = `
-    <div class="task-strip" style="background:${subj.color}"></div>
+    <div class="task-strip" style="background:${escHtml(subj.color)}"></div>
     <div class="task-body">
       <div class="test-title">${escHtml(t.title)}</div>
       ${t.notes ? `<div class="test-note">${escHtml(t.notes)}</div>` : ''}
@@ -126,9 +126,8 @@ function buildTestCard(t, index) {
     </div>
     ${scoreDisplay}
     <div class="task-actions">
-      <button class="task-act-btn" onclick="openStudyTimer('${t.id}')" title="Study Timer" style="background:rgba(124,106,247,0.15);color:var(--accent)">⏱</button>
-      <button class="task-act-btn edit" onclick="openTestEdit('${t.id}')" title="Edit">✎</button>
-      <button class="task-act-btn del" onclick="deleteTest('${t.id}', this)" title="Delete">✕</button>
+      <button class="task-act-btn edit" onclick="openTestEdit('${escJsAttr(t.id)}')" title="Edit">✎</button>
+      <button class="task-act-btn del" onclick="deleteTest('${escJsAttr(t.id)}', this)" title="Delete">✕</button>
     </div>
   `;
   return card;
@@ -248,178 +247,11 @@ function renderCountdown() {
       <div class="countdown-days ${dayCls}">${d === 0 ? '!' : d}</div>
       <div class="countdown-info">
         <div class="countdown-name">${escHtml(t.title)}</div>
-        <div class="countdown-sub" style="color:${subj.color}">${escHtml(t.subject)}</div>
+        <div class="countdown-sub" style="color:${escHtml(subj.color)}">${escHtml(t.subject)}</div>
         <div class="countdown-sub">${d === 0 ? 'Today!' : label + ' away'} · ${formatDate(t.date)}</div>
       </div>
     </div>`;
   }).join('');
-}
-
-// ═══════════════════════════════════════
-//  FEATURE 2: GRADE TREND CHART
-// ═══════════════════════════════════════
-function renderTrendChart() {
-  const svg = document.getElementById('trend-svg');
-  if (!svg) return;
-  const subjectF = document.getElementById('chart-subject-filter')?.value || 'All';
-  const graded = tests
-    .filter(t => t.date && getScorePct(t) !== null)
-    .filter(t => subjectF === 'All' || t.subject === subjectF)
-    .sort((a,b) => a.date.localeCompare(b.date));
-
-  svg.innerHTML = '';
-  if (graded.length < 2) {
-    svg.innerHTML = `<text x="350" y="85" text-anchor="middle" fill="var(--text3)" font-size="13" font-family="Manrope,sans-serif">Need at least 2 graded tests to show trend</text>`;
-    return;
-  }
-
-  const W = 700, H = 160, pad = { t:16, r:20, b:32, l:44 };
-  const iW = W - pad.l - pad.r, iH = H - pad.t - pad.b;
-  const scores = graded.map(t => getScorePct(t));
-  const minS = Math.max(0, Math.min(...scores) - 10);
-  const maxS = Math.min(100, Math.max(...scores) + 10);
-
-  const xOf = i => pad.l + (i / (graded.length - 1)) * iW;
-  const yOf = v => pad.t + iH - ((v - minS) / (maxS - minS)) * iH;
-
-  // Grid lines
-  [60, 70, 80, 90, 100].forEach(y => {
-    if (y < minS || y > maxS) return;
-    const yp = yOf(y);
-    svg.innerHTML += `<line x1="${pad.l}" y1="${yp}" x2="${W-pad.r}" y2="${yp}" stroke="var(--border)" stroke-width="1"/>`;
-    svg.innerHTML += `<text x="${pad.l-6}" y="${yp+4}" text-anchor="end" fill="var(--text3)" font-size="10" font-family="Manrope,sans-serif">${y}</text>`;
-  });
-
-  // Area fill
-  const pts = graded.map((t,i) => `${xOf(i)},${yOf(getScorePct(t))}`).join(' ');
-  const areaD = `M${xOf(0)},${yOf(getScorePct(graded[0]))} ` +
-    graded.map((t,i) => `L${xOf(i)},${yOf(getScorePct(t))}`).join(' ') +
-    ` L${xOf(graded.length-1)},${H-pad.b} L${xOf(0)},${H-pad.b} Z`;
-  svg.innerHTML += `<defs><linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--accent)" stop-opacity="0.3"/><stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>`;
-  svg.innerHTML += `<path d="${areaD}" fill="url(#trendGrad)"/>`;
-
-  // Line
-  const lineD = graded.map((t,i) => `${i===0?'M':'L'}${xOf(i)},${yOf(getScorePct(t))}`).join(' ');
-  svg.innerHTML += `<path d="${lineD}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
-
-  // Dots + labels
-  graded.forEach((t, i) => {
-    const x = xOf(i), y = yOf(getScorePct(t)), pct = getScorePct(t);
-    const col = pct >= 90 ? 'var(--success)' : pct >= 70 ? 'var(--accent)' : pct >= 60 ? 'var(--warn)' : 'var(--danger)';
-    svg.innerHTML += `<circle cx="${x}" cy="${y}" r="5" fill="${col}" stroke="var(--bg2)" stroke-width="2"/>`;
-    if (graded.length <= 10) {
-      svg.innerHTML += `<text x="${x}" y="${y-10}" text-anchor="middle" fill="var(--text2)" font-size="10" font-family="Manrope,sans-serif">${pct}%</text>`;
-    }
-    // X labels
-    if (graded.length <= 8) {
-      svg.innerHTML += `<text x="${x}" y="${H-pad.b+16}" text-anchor="middle" fill="var(--text3)" font-size="9" font-family="Manrope,sans-serif">${formatDate(t.date)}</text>`;
-    }
-  });
-}
-
-// ═══════════════════════════════════════
-//  FEATURE 3: GPA BY SUBJECT
-// ═══════════════════════════════════════
-function renderGPA() {
-  const grid = document.getElementById('gpa-grid');
-  if (!grid) return;
-  const bySubject = {};
-  tests.forEach(t => {
-    const pct = getScorePct(t);
-    if (pct === null) return;
-    if (!bySubject[t.subject]) bySubject[t.subject] = [];
-    bySubject[t.subject].push(pct);
-  });
-  if (Object.keys(bySubject).length === 0) {
-    grid.innerHTML = `<div style="color:var(--text3);font-size:13px;padding:12px 0">No graded tests yet.</div>`;
-    return;
-  }
-  grid.innerHTML = Object.entries(bySubject).map(([subj, scores]) => {
-    const avg = Math.round(scores.reduce((a,b)=>a+b,0)/scores.length);
-    const letter = getLetterGrade(avg);
-    const col = letter==='A'?'var(--success)':letter==='B'?'#60a5fa':letter==='C'?'var(--warn)':letter==='D'?'#fb923c':'var(--danger)';
-    const s = subjects.find(s=>s.name===subj)||{color:'#7c6af7'};
-    return `<div class="gpa-card" style="border-color:${hexToRgba(s.color,.3)}">
-      <div class="gpa-letter" style="color:${col}">${letter}</div>
-      <div class="gpa-pct">${avg}%</div>
-      <div class="gpa-subject" style="color:${s.color}">${escHtml(subj)}</div>
-      <div class="gpa-count">${scores.length} test${scores.length!==1?'s':''}</div>
-    </div>`;
-  }).join('');
-}
-
-function openStudyTimer(testId) {
-  timerTestId = testId;
-  const t = tests.find(x => x.id === testId);
-  document.getElementById('timer-subject-label').textContent = t ? t.subject : '';
-  document.getElementById('timer-test-name').textContent = t ? t.title : 'Study Session';
-  resetTimer();
-  document.getElementById('timer-overlay').classList.remove('hidden');
-}
-
-function closeTimer() {
-  if (timerRunning) { clearInterval(timerInterval); timerRunning = false; }
-  document.getElementById('timer-overlay').classList.add('hidden');
-}
-
-function setTimerPreset(btn, mins) {
-  document.querySelectorAll('.timer-preset-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  timerTotal = mins * 60;
-  timerSeconds = timerTotal;
-  timerRunning = false;
-  clearInterval(timerInterval);
-  document.getElementById('timer-toggle-btn').textContent = '▶ Start';
-  document.getElementById('timer-phase').textContent = mins <= 15 ? 'Break' : 'Focus';
-  updateTimerDisplay();
-}
-
-function toggleTimer() {
-  if (timerRunning) {
-    clearInterval(timerInterval);
-    timerRunning = false;
-    document.getElementById('timer-toggle-btn').textContent = '▶ Resume';
-  } else {
-    timerRunning = true;
-    document.getElementById('timer-toggle-btn').textContent = '⏸ Pause';
-    timerInterval = setInterval(() => {
-      timerSeconds--;
-      updateTimerDisplay();
-      if (timerSeconds <= 0) {
-        clearInterval(timerInterval);
-        timerRunning = false;
-        timerSessions++;
-        document.getElementById('timer-sessions').textContent = `Sessions completed: ${timerSessions}`;
-        document.getElementById('timer-toggle-btn').textContent = '▶ Start';
-        timerSeconds = timerTotal;
-        updateTimerDisplay();
-        toast('⏱ Timer complete! Great work!', 'success');
-      }
-    }, 1000);
-  }
-}
-
-function resetTimer() {
-  clearInterval(timerInterval);
-  timerRunning = false;
-  timerSeconds = timerTotal;
-  document.getElementById('timer-toggle-btn').textContent = '▶ Start';
-  updateTimerDisplay();
-}
-
-function updateTimerDisplay() {
-  const m = Math.floor(timerSeconds / 60);
-  const s = timerSeconds % 60;
-  const disp = document.getElementById('timer-display');
-  const circle = document.getElementById('timer-ring-circle');
-  disp.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-  const pct = timerSeconds / timerTotal;
-  const circumference = 2 * Math.PI * 80;
-  circle.style.strokeDashoffset = circumference * (1 - pct);
-  const col = pct > 0.33 ? 'var(--accent)' : pct > 0.1 ? 'var(--warn)' : 'var(--danger)';
-  circle.style.stroke = col;
-  disp.className = 'timer-display' + (pct <= 0.1 ? ' danger' : pct <= 0.33 ? ' warn' : '');
-  document.getElementById('timer-sessions').textContent = `Sessions completed: ${timerSessions}`;
 }
 
 function openFlashcards() {
