@@ -132,9 +132,7 @@ textarea:focus-visible {
     transition-duration: 0.01ms !important;
   }
   .task-card:hover,
-  .test-card:hover,
-  .stat-card:hover,
-  .countdown-card:hover {
+  .stat-card:hover {
     transform: none;
   }
   .progress-fill {
@@ -142,8 +140,7 @@ textarea:focus-visible {
   }
 }
 
-/* Animated background mesh — provides depth wash on all themes.
-   Daytime hides it because the blue-sky starfield fills that role. */
+/* Animated background mesh — provides depth wash on all themes. */
 body::before {
   content: '';
   position: fixed;
@@ -162,8 +159,11 @@ html.theme-light body::before {
     radial-gradient(ellipse 60% 40% at 18% 22%, var(--accent-glow) 0%, transparent 52%),
     radial-gradient(ellipse 55% 45% at 72% 82%, rgba(59,130,246,0.06) 0%, transparent 58%);
 }
-html.theme-daytime body::before { display: none; }
-/* Dawn/dusk mesh — warm orientation washes keyed to the active accent glow. */
+html.theme-daytime body::before {
+  background:
+    radial-gradient(ellipse 60% 40% at 18% 22%, var(--accent-glow) 0%, transparent 52%),
+    radial-gradient(ellipse 55% 45% at 72% 82%, rgba(59,130,246,0.06) 0%, transparent 58%);
+}
 html.theme-dawn body::before {
   background:
     radial-gradient(ellipse 55% 50% at 15% 25%, var(--accent-glow) 0%, transparent 55%),
@@ -324,30 +324,22 @@ html.theme-dusk body::before {
    Ambient shadow lifts white cards off the tinted surface; hover
    deepens the shadow for a "lifting" feel. */
 html.theme-light .task-card,
-html.theme-light .test-card,
 html.theme-light .stat-card,
-html.theme-light .countdown-card,
-html.theme-light .subject-item,
-html.theme-light .template-item {
+html.theme-light .subject-item {
   box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
 }
-html.theme-light .task-card:hover,
-html.theme-light .test-card:hover {
+html.theme-light .task-card:hover {
   box-shadow: 0 4px 16px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06);
 }
 /* ── Daytime card elevation ──
    Same white-cards-on-tinted-bg model as light theme. Daytime background
    (#e3edf8) is sky-blue, cards (#fff) float on top via subtle shadow. */
 html.theme-daytime .task-card,
-html.theme-daytime .test-card,
 html.theme-daytime .stat-card,
-html.theme-daytime .countdown-card,
-html.theme-daytime .subject-item,
-html.theme-daytime .template-item {
+html.theme-daytime .subject-item {
   box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
 }
-html.theme-daytime .task-card:hover,
-html.theme-daytime .test-card:hover {
+html.theme-daytime .task-card:hover {
   box-shadow: 0 4px 16px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06);
 }
 
@@ -390,7 +382,6 @@ html.theme-daytime .test-card:hover {
 .task-actions { display: flex; gap: var(--space-xxs); opacity: 0; transition: opacity var(--transition); }
 .task-card:hover .task-actions { opacity: 1; }
 .task-card:focus-within .task-actions { opacity: 1; }
-.test-card .task-actions { opacity: 1; }
 .task-act-btn {
   width: 36px; height: 36px; border-radius: 8px; border: none; cursor: pointer;
   font-size: 13px; display: flex; align-items: center; justify-content: center;
@@ -501,102 +492,9 @@ input[type="range"] {
   padding-left: 4px;
 }
 
-/* ── TABS ── */
-.tab-nav {
-  display: flex;  gap: var(--space-xxs); margin-bottom: var(--space-xl);
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: 12px; padding: 5px; flex-wrap: wrap;
-}
-.tab-btn {
-  flex: 1; padding: 9px 16px; border-radius: 9px; border: none; cursor: pointer;
-  font-family: var(--font-body); font-size: 13px; font-weight: 600;
-  transition: all var(--transition); color: var(--text2); background: transparent;
-  display: flex; align-items: center; justify-content: center; gap: 6px;
-  min-height: 44px; /* touch target */
-}
-.tab-btn:hover { color: var(--text); background: var(--surface); }
-.tab-btn.active { background: var(--accent); color: #fff; box-shadow: 0 2px 12px rgba(124,106,247,0.35); }
+/* ── PANELS ── */
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
-
-/* ── TEST TRACKER ── */
-.test-stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-sm); margin-bottom: var(--space-xl); }
-.test-card {
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 15px 18px;
-  display: flex; align-items: flex-start; gap: 14px;
-  transition: all var(--transition); animation: fadeUp 0.25s ease both;
-  content-visibility: auto;
-  contain-intrinsic-size: auto 72px;
-}
-.test-card:hover { border-color: var(--accent); transform: translateX(2px); box-shadow: var(--shadow); }
-.test-card.passed { border-left: 3px solid var(--success); }
-.test-card.failed { border-left: 3px solid var(--danger); }
-.test-card.upcoming { border-left: 3px solid var(--accent); }
-.test-title { font-size: 14px; font-weight: 600; margin-bottom: 5px; word-break: break-word; }
-.test-note { font-size: 12px; color: var(--text2); margin-bottom: 7px; }
-.test-meta { display: flex; align-items: center; gap: var(--space-xs); flex-wrap: wrap; }
-.test-score-display {
-  font-family: var(--font-head); font-size: 28px; font-weight: 800;
-  line-height: 1; white-space: nowrap; flex-shrink: 0; margin-top: 2px;
-}
-.test-score-display.pass { color: var(--success); }
-.test-score-display.fail { color: var(--danger); }
-.test-score-display.pending { color: var(--text3); }
-/* ── FEATURE: COUNTDOWN PANEL ── */
-.countdown-panel { margin-bottom: 22px; }
-.countdown-title { font-family: var(--font-head); font-size: 13px; font-weight: 700; text-transform:uppercase; letter-spacing:0.8px; color:var(--text3); margin-bottom:10px; }
-.countdown-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap:10px; }
-.countdown-card {
-  background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px;
-  display:flex; align-items:center; gap:14px; transition: border-color var(--transition);
-}
-.countdown-card:hover { border-color: var(--accent); }
-.countdown-card.urgent { border-color: rgba(248,113,113,0.5); background: rgba(248,113,113,0.04); }
-.countdown-card.soon { border-color: rgba(250,204,21,0.4); background: rgba(250,204,21,0.04); }
-.countdown-days { font-family: var(--font-head); font-size: 32px; font-weight: 800; line-height:1; min-width:44px; text-align:center; }
-.countdown-days.urgent { color: var(--danger); }
-.countdown-days.soon { color: var(--warn); }
-.countdown-days.ok { color: var(--accent); }
-.countdown-info { min-width:0; }
-.countdown-name { font-size:13px; font-weight:600; margin-bottom:3px; word-break:break-word; }
-.countdown-sub { font-size:11px; color:var(--text2); }
-
-
-
-/* ── FEATURE: FLASHCARDS ── */
-.flashcard-overlay {
-  position:fixed; inset:0; background:rgba(0,0,0,0.75); backdrop-filter:blur(10px);
-  z-index:500; display:flex; align-items:center; justify-content:center; padding:20px;
-  animation: fadeIn 0.2s ease;
-}
-.flashcard-modal {
-  background: var(--bg2); border:1px solid var(--border); border-radius:24px; padding:28px;
-  max-width:540px; width:100%;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-}
-.flashcard-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
-.flashcard-progress { font-size:13px; color:var(--text2); font-weight:600; }
-.fc-scene { width:100%; height:220px; perspective:1000px;margin-bottom: var(--space-lg); cursor: pointer; }
-.fc-card {
-  width:100%; height:100%; position:relative; transform-style:preserve-3d;
-  transition: transform 0.5s cubic-bezier(.4,0,.2,1); border-radius:16px;
-}
-.fc-card.flipped { transform: rotateY(180deg); }
-.fc-face {
-  position:absolute; inset:0; backface-visibility:hidden; border-radius:16px;
-  display:flex; align-items:center; justify-content:center; padding:24px;
-  flex-direction:column; gap:10px; text-align:center;
-  border:1px solid var(--border);
-}
-.fc-front { background: var(--surface); }
-.fc-back { background: var(--bg3); transform: rotateY(180deg); }
-.fc-face-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:var(--text3); }
-.fc-face-text { font-size:16px; font-weight:600; color:var(--text); line-height:1.4; }
-.fc-face-score { font-family:var(--font-head); font-size:48px; font-weight:800; }
-.fc-nav { display:flex; gap:10px; align-items:center; justify-content:center; }
-.fc-hint { font-size:12px; color:var(--text3); text-align:center; margin-top:12px; }
-
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -606,12 +504,9 @@ input[type="range"] {
 /* Responsive */
 @media (max-width: 600px) {
   .stats-row { grid-template-columns: repeat(2, 1fr); }
-  .test-stats-row { grid-template-columns: repeat(2, 1fr); }
   .form-grid, .form-grid-3 { grid-template-columns: 1fr; }
   .search-input { width: 100%; }
   .toolbar { flex-direction: column; align-items: stretch; }
-
-  .countdown-grid { grid-template-columns: 1fr; }
 }
 
 /* Confetti canvas */
@@ -620,11 +515,6 @@ input[type="range"] {
 /* ── COMPACT VIEW ── */
 .task-card.compact { padding: 10px 14px; }
 .task-card.compact .task-note { display: none; }
-
-/* ── RECURRING badge ── */
-.badge-recurring { background: rgba(96,165,250,0.15); color: #60a5fa; border-color: rgba(96,165,250,0.3); }
-.badge-streak { background: rgba(251,146,60,0.15); color: #fb923c; border-color: rgba(251,146,60,0.3); }
-.badge-daily-reset { background: rgba(250,204,21,0.12); color: #fde68a; border-color: rgba(250,204,21,0.25); }
 
 /* Star button */
 .star-btn {
@@ -647,158 +537,6 @@ input[type="range"] {
 .toast-undo:hover { filter: brightness(1.2); }
 
 .hidden { display: none !important; }
-
-/* ── SUBTASK EDITOR (in task modal) ── */
-.subtask-editor {
-  margin-bottom: var(--space-md);
-  background: var(--bg3); border: 1px solid var(--border); border-radius: 12px;
-  padding: 14px;
-}
-.subtask-editor-title {
-  font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase;
-  letter-spacing: 0.7px; margin-bottom: 10px;
-}
-.subtask-input-row {
-  display: flex; gap: var(--space-xs); margin-bottom: 10px;
-}
-.subtask-input-row input {
-  flex: 1; background: var(--surface); color: var(--text); border: 1.5px solid var(--border);
-  border-radius: 8px; padding: var(--space-xs) var(--space-sm); font-family: var(--font-body); font-size: 13px;
-  outline: none; min-height: 40px;
-}
-.subtask-input-row input:focus { border-color: var(--accent); }
-.subtask-list {
-  display: flex; flex-direction: column; gap: 6px;
-}
-.subtask-item {
-  display: flex; align-items: center; gap: 8px; padding: 6px 8px;
-  background: var(--surface); border-radius: 8px; border: 1px solid var(--border);
-}
-.subtask-item .task-checkbox {
-  width: 20px; height: 20px; margin-top: 0;
-}
-.subtask-item .task-checkbox svg { width: 10px; height: 7px; }
-.subtask-text {
-  flex: 1; font-size: 13px; color: var(--text); font-weight: 500;
-}
-.subtask-text.done { text-decoration: line-through; color: var(--text3); }
-.subtask-remove {
-  width: 28px; height: 28px; border-radius: 6px; border: none; cursor: pointer;
-  font-size: 11px; display: flex; align-items: center; justify-content: center;
-  background: transparent; color: var(--text3); transition: all var(--transition);
-}
-.subtask-remove:hover { background: rgba(248,113,113,0.15); color: var(--danger); }
-
-/* ═══════════════════════════════════════
-   ★ VIEW MODE: FOCUS — UI chrome fades out, starfield remains.
-   Toggle via ` (backtick), Night Sky button, or App.toggleFocus().
-   Esc (or clicking the floating hint) exits back to the normal view.
-   ═══════════════════════════════════════ */
-.app {
-  /* Smooth fade on enter/exit so the starfield doesn't pop in/out sharply.
-     will-change is only applied during the focus-mode transition to avoid
-     permanent GPU memory retention. */
-  transition: opacity 0.55s ease, transform 0.55s ease, filter 0.55s ease;
-}
-html.focus-mode .app,
-html.focus-exiting .app {
-  will-change: opacity;
-}
-html.focus-mode .app {
-  opacity: 0;
-  transform: translateY(6px);
-  filter: blur(2px);
-  pointer-events: none;
-  /* The UI is hidden but still in the layout so the transition back is smooth. */
-}
-html.focus-mode .skip-link,
-html.focus-mode .dev-trigger-dot,
-html.focus-mode #confetti-canvas {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.4s ease;
-}
-/* Promote the starfield above the (now-hidden) app so the sky reads as the only UI. */
-html.focus-mode #starfield {
-  z-index: 5;
-}
-
-/* Avoid painting the body mesh gradient on top of the starfield in night-sky mode —
-   the gamification.js injects its own background gradient on .starfield, and the
-   body::before wash was washing the sky back to a purple wash. */
-html.night-sky-mode body::before { display: none; }
-html.theme-night-sky body { background: #060414; }
-
-/* ═══════════════════════════════════════
-   ★ MODE EXIT HINT — small chip at the bottom that fades in while focus
-   or night-sky mode is active. Always-off when both modes are off.
-   ═══════════════════════════════════════ */
-#mode-exit-hint {
-  position: fixed;
-  bottom: 28px;
-  left: 50%;
-  transform: translateX(-50%) translateY(18px);
-  background: rgba(8, 6, 20, 0.66);
-  color: rgba(255, 255, 255, 0.92);
-  padding: 9px 16px;
-  border-radius: 99px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  font-family: var(--font-body);
-  font-size: 12px;
-  font-weight: 500;
-  z-index: 1000;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.5s ease, transform 0.5s ease;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
-}
-html.focus-mode #mode-exit-hint,
-html.night-sky-mode #mode-exit-hint {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-  pointer-events: auto;
-}
-#mode-exit-hint kbd {
-  background: rgba(255, 255, 255, 0.15);
-  color: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 5px;
-  padding: 2px 7px;
-  font-family: var(--font-body);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-}
-/* ═══════════════════════════════════════
-   ★ HOLD-KEY SHORTCUTS — Settings rows for the rebindable Focus + Night-Sky
-   hold-keys. Each input is single-character; backspace clears the binding.
-   ═══════════════════════════════════════ */
-.hold-key-row {
-  display: flex; align-items: center; gap: 12px;
-  margin-bottom: 10px; padding: 8px 0;
-}
-.hold-key-row label {
-  flex: 0 0 130px; font-size: 13px; color: var(--text2); font-weight: 500;
-}
-.hold-key-row input[type="text"] {
-  width: 44px; height: 44px; min-height: 44px;
-  background: var(--surface); border: 1.5px solid var(--border);
-  color: var(--text); border-radius: 10px;
-  font-family: var(--font-head); font-weight: 700; font-size: 16px;
-  text-align: center; text-transform: uppercase;
-  outline: none; cursor: pointer;
-  transition: border-color var(--transition);
-}
-.hold-key-row input[type="text"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
-.hold-key-row .hk-hint {
-  flex: 1; font-size: 11px; color: var(--text3);
-  font-weight: 500; line-height: 1.3;
-}
 
 /* ═══════════════════════════════════════
    ★ COMMAND PALETTE — Ctrl+K / Cmd+K overlay
@@ -885,19 +623,12 @@ html.night-sky-mode #mode-exit-hint {
 }
 
 /* ═══════════════════════════════════════
-   ★ REDUCED MOTION — drop the focus fade animations for a11y.
+   ★ REDUCED MOTION — drop animations for a11y.
    ═══════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
   .app,
-  #mode-exit-hint,
-  html.focus-mode .app,
-  html.focus-mode .skip-link,
-  html.focus-mode .dev-trigger-dot {
+  .task-card,
+  .stat-card {
     transition: none !important;
-  }
-  html.focus-mode .app {
-    opacity: 0.05;
-    transform: none;
-    filter: none;
   }
 }

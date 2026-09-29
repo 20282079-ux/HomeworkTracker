@@ -9,23 +9,15 @@
 // close both the palette AND trigger _closeAllSoft (undesirable).
 
 var COMMANDS = [
-  // ── Navigation ──
-  { id: 'tab-hw',      label: 'Homework Tab',          category: 'Navigation', icon: '📚', shortcut: '',  action: function() { App.switchTab('hw'); } },
-  { id: 'tab-tests',   label: 'Tests Tab',             category: 'Navigation', icon: '🧪', shortcut: '',  action: function() { App.switchTab('tests'); } },
-
   // ── Tasks ──
   { id: 'add-task',    label: 'Add Task',              category: 'Tasks',      icon: '＋', shortcut: 'N', action: function() { App.openAddForm(); } },
-  { id: 'add-test',    label: 'Add Test',              category: 'Tests',      icon: '🧪', shortcut: '',  action: function() { App.openTestForm(); } },
-  { id: 'search-tasks',label: 'Search Tasks',          category: 'Tasks',      icon: '🔍', shortcut: '',  action: function() { App.switchTab('hw'); setTimeout(function() { var s = document.getElementById('search-input'); if (s) s.focus(); }, 50); } },
+  { id: 'search-tasks',label: 'Search Tasks',          category: 'Tasks',      icon: '🔍', shortcut: '',  action: function() { setTimeout(function() { var s = document.getElementById('search-input'); if (s) s.focus(); }, 50); } },
 
   // ── View ──
   { id: 'toggle-compact', label: 'Toggle Compact View', category: 'View',     icon: '⊟', shortcut: '',  action: function() { App.toggleCompact(); } },
   { id: 'open-settings',  label: 'Open Settings',       category: 'App',       icon: '⚙', shortcut: '',  action: function() { App.openSettings(); } },
-  { id: 'open-flashcards',label: 'Open Flashcards',     category: 'Tests',     icon: '🃏', shortcut: '',  action: function() { App.openFlashcards(); } },
 
   // ── Data ──
-  { id: 'export-csv',     label: 'Export to CSV',           category: 'Data',  icon: '↓',  shortcut: '', action: function() { App.exportCSV(); } },
-  { id: 'export-ics',     label: 'Export to Calendar (.ics)', category: 'Data', icon: '📅', shortcut: '', action: function() { App.exportICS(); } },
   { id: 'clear-all',      label: 'Clear All Tasks',         category: 'Data',  icon: '🗑', shortcut: '', action: function() { App.clearAllTasks(); } },
 
   // ── Themes ──
@@ -37,9 +29,8 @@ var COMMANDS = [
   { id: 'theme-light',    label: 'Theme: Light',    category: 'Theme', icon: '☀️', shortcut: '', action: function() { App.applyPreset('light'); } },
   { id: 'theme-coffee',   label: 'Theme: Coffee',   category: 'Theme', icon: '☕', shortcut: '', action: function() { App.applyPreset('coffee'); } },
 
-  // ── Help / Dev ──
+  // ── Help ──
   { id: 'shortcuts',      label: 'Keyboard Shortcuts', category: 'Help',      icon: '⌨',   shortcut: '', action: function() { App.showKeybindsHelp(); } },
-  { id: 'dev-console',    label: 'Dev Console',         category: 'Dev',       icon: '🖥️', shortcut: '', action: function() { if (typeof DevMode !== 'undefined') DevMode.open(); } },
 ];
 
 // ── State ──

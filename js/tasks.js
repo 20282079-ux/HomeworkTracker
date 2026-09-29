@@ -2,8 +2,6 @@
 //
 // Perf notes:
 // - buildCard O(n) subject lookup → cached as a single hash map per render.
-// - `render()` shouldn't re-rebuild the starfield if nothing user-visible
-//   changed. We skip `renderAmbientTree()` when no task mutation triggered.
 let _subjByName = {}; // populated by filterTasks() so buildCard is O(1) per card
 function render() {
   renderFilterChips();
@@ -122,19 +120,8 @@ function buildCard(t, index) {
   }
 
   const timeBadge = t.time ? `<span class="badge badge-due">⏱ ${t.time}m</span>` : '';
-  const recurBadge = t.recurring ? `<span class="badge badge-recurring">🔁 ${escHtml(t.recurring)}</span>` : '';
   const statusBadge = t.status === 'in-progress' ? `<span class="badge" style="background:rgba(96,165,250,.15);color:#60a5fa;border-color:rgba(96,165,250,.3)">In Progress</span>` : '';
 
-  // Streak badge for daily tasks
-  let streakBadge = '';
-  if (t.recurring === 'daily' && t.streak > 0) {
-    streakBadge = `<span class="badge badge-streak">🔥 ${t.streak}d streak</span>`;
-  }
-  // Daily-reset indicator: was done yesterday, now reset
-  let dailyResetBadge = '';
-  if (t.recurring === 'daily' && t.status !== 'done' && t.lastCheckedDate && t.lastCheckedDate !== todayStr()) {
-    dailyResetBadge = `<span class="badge badge-daily-reset">↺ Reset today</span>`;
-  }
   const pinnedClass = t.pinned ? ' pinned' : '';
   card.className = `task-card${isDone ? ' done' : ''}${isOverdue ? ' overdue' : ''}${isSoon && !isOverdue ? ' due-soon' : ''}${compactMode ? ' compact' : ''}${pinnedClass}`;
 
@@ -153,9 +140,6 @@ function buildCard(t, index) {
         ${statusBadge}
         ${dueBadge}
         ${timeBadge}
-        ${recurBadge}
-        ${streakBadge}
-        ${dailyResetBadge}
       </div>
     </div>
     <div class="task-actions">
@@ -232,7 +216,6 @@ function openEdit(id) {
   document.getElementById('m-due').value = t.due || '';
   document.getElementById('m-priority').value = t.priority;
   document.getElementById('m-time').value = t.time || '';
-  document.getElementById('m-recurring').value = t.recurring || '';
   document.getElementById('m-status').value = t.status;
   openModal();
 }
@@ -251,7 +234,6 @@ function saveTask() {
     due: document.getElementById('m-due').value,
     priority: document.getElementById('m-priority').value,
     time: parseInt(document.getElementById('m-time').value) || 0,
-    recurring: document.getElementById('m-recurring').value,
     status: document.getElementById('m-status').value,
   };
   if (editingId) {
@@ -269,41 +251,24 @@ function saveTask() {
 
 // Unified "mark complete and remove" path. Per user request, checking off a
 // task AND tapping the delete button both go through this same flow. Both
-// entry points set status='done' (preserves streak math) then remove the
-// task from the array; the 5-second undo toast gives the user a generous
-// window to recover from accidental taps.
+// entry points set status='done' then remove the task from the array; the
+// 5-second undo toast gives the user a generous window to recover from
+// accidental taps.
 function _markCompleteAndRemove(id) {
   const t = tasks.find(function(x){return x.id === id;});
   if (!t) return;
   const wasDone = t.status === 'done';
-  // Streak math: keep it identical to the pre-existing toggleDone behavior
-  // so the metric counters (Orion / Ursa Minor) keep growing as expected.
-  if (!wasDone && t.recurring === 'daily') {
-    const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
-    const yStr = yesterday.toISOString().split('T')[0];
-    t.streak = (!t.lastCheckedDate || t.lastCheckedDate === yStr || t.lastCheckedDate === todayStr()) ? ((t.streak || 0) + 1) : 1;
-    t.lastCheckedDate = todayStr();
-  } else if (wasDone && t.recurring === 'daily') {
-    t.streak = Math.max(0, (t.streak || 1) - 1);
-    t.lastCheckedDate = null;
-  }
-  if (!wasDone && t.recurring && t.recurring !== 'daily') {
-    t.lastCheckedDate = todayStr();
-  }
 
-  // Mark done (preserves streak / lastCheckedDate) then remove from array.
+  // Mark done then remove from array.
   t.status = 'done';
   lastDeleted = { task: Object.assign({}, t), index: tasks.findIndex(function(x){return x.id === id;}) };
   tasks = tasks.filter(function(x){return x.id !== id;});
 
-  // Side-effects identical to old toggleDone/deleteTask: confetti (when on),
-  // tree-growth notification, persist, refresh view.
+  // Side-effects: confetti (when on), completion click, persist, refresh view.
   // ── Data integrity: save BEFORE side-effects so a crash mid-render doesn't lose state. ──
   save();
   if (!wasDone && document.getElementById('s-confetti') && document.getElementById('s-confetti').checked) launchConfetti();
-  if (!wasDone && typeof fireShootingStar === 'function') fireShootingStar();
-  if (!wasDone && typeof notifyTreeGrowth === 'function') notifyTreeGrowth();
-  if (typeof notifyTreeDeletion === 'function') notifyTreeDeletion();
+  if (!wasDone && typeof playClick === 'function') playClick();
   filterTasks();
   renderStats();
 
@@ -346,64 +311,6 @@ function togglePin(id) {
   filterTasks();
 }
 
-// ── DAILY / WEEKLY RESET ──
-function dailyReset() {
-  const today = todayStr();
-  let changed = false;
-  tasks.forEach(t => {
-    if (t.recurring === 'daily' && t.status === 'done' && t.lastCheckedDate !== today) {
-      t.status = 'pending';
-      changed = true;
-    }
-  });
-  if (changed) { save(); toast('Daily tasks have been reset 🔄', ''); }
-}
-
-function weeklyReset() {
-  // Reset weekly tasks at the start of a new week (Monday)
-  const today = new Date();
-  const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon…
-  // Get the Monday of the current week
-  const monday = new Date(today);
-  monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-  const mondayStr = monday.toISOString().split('T')[0];
-  let changed = false;
-  tasks.forEach(t => {
-    if (t.recurring === 'weekly' && t.status === 'done') {
-      const checked = t.lastCheckedDate || '';
-      // If last checked before this Monday, reset
-      if (checked < mondayStr) {
-        t.status = 'pending';
-        changed = true;
-      }
-    }
-    if (t.recurring === 'biweekly' && t.status === 'done') {
-      // Reset if last checked more than 14 days ago
-      if (t.lastCheckedDate) {
-        const d = getDaysLeft(t.lastCheckedDate);
-        if (d < -14) { t.status = 'pending'; changed = true; }
-      }
-    }
-    if (t.recurring === 'monthly' && t.status === 'done') {
-      // Reset at start of each month
-      const thisMonth = todayStr().slice(0,7);
-      const checkedMonth = (t.lastCheckedDate || '').slice(0,7);
-      if (checkedMonth < thisMonth) { t.status = 'pending'; changed = true; }
-    }
-  });
-  if (changed) save();
-}
-
-function pruneCompletedPastDue() {
-  // Auto-delete non-recurring tasks that are done AND past their due date
-  const today = todayStr();
-  const removed = tasks.filter(t => !t.recurring && t.status === 'done' && t.due && t.due < today);
-  if (removed.length === 0) return;
-  tasks = tasks.filter(t => !((!t.recurring) && t.status === 'done' && t.due && t.due < today));
-  save();
-  toast(`🧹 Auto-removed ${removed.length} completed past-due task${removed.length>1?'s':''}`, '');
-}
-
 function clearAllTasks() {
   if (!confirm('Delete ALL tasks? This cannot be undone.')) return;
   tasks = [];
@@ -417,7 +324,6 @@ function clearModalForm() {
   ['m-title','m-notes','m-due','m-time'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('m-priority').value = 'Medium';
   document.getElementById('m-status').value = 'pending';
-  document.getElementById('m-recurring').value = '';
   document.getElementById('m-subject').value = subjects[0]?.name || '';
 }
 

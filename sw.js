@@ -8,7 +8,7 @@
 // worker activate immediately; app.js still toasts to prompt a refresh so the
 // in-memory state is rebuilt from the new scripts.
 
-var CACHE_NAME = 'hw-tracker-v6';
+var CACHE_NAME = 'hw-tracker-v8';
 
 // Every same-origin asset needed to boot the app. Keep this in sync with the
 // <link>/<script> tags in index.html — a missing script here means the app
@@ -22,14 +22,9 @@ var APP_SHELL = [
   '/icon-512.png',
   '/apple-touch-icon.png',
   '/css/styles.css',
-  '/css/gamification.css',
-  '/css/devmode.css',
-  '/js/gamification.js',
-  '/js/devmode.js',
   '/js/state.js',
   '/js/util.js',
   '/js/tasks.js',
-  '/js/tests.js',
   '/js/settings.js',
   '/js/command-palette.js',
   '/js/app.js',

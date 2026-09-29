@@ -95,18 +95,8 @@ function hexToRgba(hex, alpha) {
 }
 
 // ═══════════════════════════════════════
-//  TABS
-function switchTab(tab) {
-  document.getElementById('panel-hw').classList.toggle('active', tab === 'hw');
-  document.getElementById('panel-tests').classList.toggle('active', tab === 'tests');
-  document.getElementById('tab-hw').classList.toggle('active', tab === 'hw');
-  document.getElementById('tab-tests').classList.toggle('active', tab === 'tests');
-  if (tab === 'tests') {
-    populateTestSubjectSelect();
-    renderTests();
-  }
-}
-
+//  COMPACT VIEW
+// ═══════════════════════════════════════
 function toggleCompact() {
   compactMode = !compactMode;
   var btn = document.getElementById('compact-btn');

@@ -1,21 +1,12 @@
-// 6-settings.js (split from app.js) — settings modal, subjects CRUD, exports
+// 6-settings.js (split from app.js) — settings modal, subjects CRUD, and the
+// task-completion sound.
 function openSettings() {
   renderSubjectList();
   syncColorInputs();
-  renderTemplateList();
   // Sync the sound-toggle checkbox on settings open so it reflects the
   // current persisted state (defaulting to ON if never set).
   var ssnd = document.getElementById('s-sound');
   if (ssnd && typeof _soundEnabled !== 'undefined') ssnd.checked = _soundEnabled;
-  // Populate the hold-key inputs from the persisted map.
-  var hk = (typeof getHoldKeys === 'function') ? getHoldKeys() : { focus:'f', nightSky:'n' };
-  var fEl = document.getElementById('hk-focus');
-  var nEl = document.getElementById('hk-nightsky');
-  if (fEl) fEl.value = hk.focus || '';
-  if (nEl) nEl.value = hk.nightSky || '';
-  // Sync auto-theme toggle to reflect persisted localStorage state.
-  var autoThemeEl = document.getElementById('s-auto-theme');
-  if (autoThemeEl) { try { autoThemeEl.checked = localStorage.getItem('hw_auto_theme') === '1'; } catch(e) { /* localStorage may be full or disabled */ } }
   document.getElementById('settings-modal').classList.remove('hidden');
 }
 function closeSettings() { document.getElementById('settings-modal').classList.add('hidden'); save(); }
@@ -82,16 +73,8 @@ function applyPreset(name) {
   const p = PRESETS[name];
   if (!p) return;
   Object.entries(p).forEach(([k,v]) => document.documentElement.style.setProperty(k, v));
-  // Persist the preset name so the theme-* class is restored on the
-  // next page load. Without this the CSS selectors that depend on
-  // html.theme-light (body::before mesh, #starfield/#constellation-panel
-  // hide rules) stop matching after a refresh.
+  // Persist the preset name so it survives a page refresh.
   try { localStorage.setItem('hw_preset', name); } catch (e) { /* non-critical — best-effort persistence */ }
-  // Re-theme the starfield canvas to match the new color scheme —
-  // unique constellation palette per theme + sky gradient swap.
-  // `applyStarfieldTheme` is defined in gamification.js and reaches
-  // every already-built slot's CSS vars + redraws lines per theme.
-  if (typeof applyStarfieldTheme === 'function') applyStarfieldTheme(name);
   syncColorInputs();
   toast(`Theme: ${name} ✓`, 'success');
 }
@@ -153,64 +136,29 @@ function populateSubjectSelects() {
     sel.innerHTML = subjects.map(s => `<option value="${escHtml(s.name)}">${escHtml(s.name)}</option>`).join('');
     if (subjects.find(s => s.name === cur)) sel.value = cur;
   });
-  // also refresh test modal subject select if open
-  populateTestSubjectSelect(document.getElementById('t-subject')?.value);
 }
 
-function exportCSV() {
-  const header = ['Title','Subject','Priority','Status','Due Date','Est. Time (min)','Notes','Recurring'];
-  const rows = tasks.map(t => [t.title, t.subject, t.priority, t.status, t.due||'', t.time||'', t.notes||'', t.recurring||''].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
-  const csv = [header.join(','), ...rows].join('\n');
-  const a = document.createElement('a');
-  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-  a.download = 'homework-tracker.csv';
-  a.click();
-  toast('Exported to CSV ✓', 'success');
+// ═══════════════════════════════════════
+//  SOUND (task-completion click)
+// ═══════════════════════════════════════
+var _audioCtx = null;
+var _soundEnabled = (function(){ try { return localStorage.getItem('hw_sound_enabled') !== '0'; } catch(e) { return true; } })();
+function toggleSound() {
+  _soundEnabled = !_soundEnabled;
+  try { localStorage.setItem('hw_sound_enabled', _soundEnabled ? '1' : '0'); } catch (e) {}
+  toast(_soundEnabled ? '🔊 Sound on' : '🔇 Sound off', '', 1200);
 }
-
-function exportICS() {
-  var pending = tasks.filter(function(t) { return t.status !== 'done' && t.due; });
-  if (pending.length === 0) { toast('No pending tasks with due dates to export', 'error'); return; }
-  var lines = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//Homework Tracker//EN',
-    'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH'
-  ];
-  pending.forEach(function(t) {
-    var d = t.due.split('-');
-    var ymd = d[0] + String(d[1]).padStart(2,'0') + String(d[2]).padStart(2,'0');
-    var subj = t.subject || 'Other';
-    var priority = t.priority === 'Urgent' ? '1' : t.priority === 'High' ? '3' : t.priority === 'Medium' ? '5' : '9';
-    var desc = (t.notes || '').replace(/\n/g, '\\n');
-    if (t.time) desc += (desc ? '\\n' : '') + 'Estimated time: ' + t.time + ' min';
-    desc += (desc ? '\\n' : '') + 'Priority: ' + t.priority;
-    // Escape special characters for iCalendar
-    var summary = (t.title + ' — ' + subj).replace(/,/g, '\\,').replace(/;/g, '\\;');
-    desc = desc.replace(/,/g, '\\,').replace(/;/g, '\\;');
-    lines.push('BEGIN:VEVENT');
-    lines.push('UID:' + t.id + '@homework-tracker');
-    lines.push('DTSTAMP:' + new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, ''));
-    lines.push('DTSTART;VALUE=DATE:' + ymd);
-    lines.push('DTEND;VALUE=DATE:' + ymd);
-    lines.push('SUMMARY:' + summary);
-    if (desc) lines.push('DESCRIPTION:' + desc);
-    lines.push('PRIORITY:' + priority);
-    lines.push('STATUS:CONFIRMED');
-    lines.push('TRANSP:TRANSPARENT');
-    lines.push('END:VEVENT');
-  });
-  lines.push('END:VCALENDAR');
-  var icsContent = lines.join('\r\n');
-  var blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url;
-  a.download = 'homework-tracker.ics';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  toast('Exported ' + pending.length + ' events to Google Calendar ✓', 'success');
+function getAudioCtx() {
+  if (!_audioCtx) { try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  return _audioCtx;
 }
+function playTone(freq, type, duration, vol) {
+  var ctx = getAudioCtx(); if (!ctx) return;
+  var osc = ctx.createOscillator(); var gain = ctx.createGain();
+  osc.type = type || 'sine'; osc.frequency.value = freq;
+  gain.gain.setValueAtTime(vol || 0.10, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.start(); osc.stop(ctx.currentTime + duration);
+}
+function playClick()   { if (!_soundEnabled) return; playTone(600,'sine',.03,.05); }

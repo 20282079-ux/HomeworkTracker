@@ -7,8 +7,9 @@
 // evaluates a run of <script> tags in one realm.
 //
 // Coverage: escaping helpers, date/grade math, storage round-trips, task
-// filtering/sorting, recurring resets, completion + undo, export output, and a
-// structural guard that the removed quick-add/parser/voice modules stay gone.
+// filtering/sorting, completion + undo, and a structural guard that the
+// removed quick-add/parser/voice, tests-tab/starfield/dev-mode and
+// templates/subtasks/recurring/export surfaces stay gone.
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createContext, runInContext } from 'node:vm';
@@ -184,15 +185,13 @@ function buildSandbox(document, localStorage) {
 
 const sandbox = buildSandbox(doc, storage);
 
-// Load in the same dependency order as index.html, minus the heavy/graphics
-// modules (gamification.js, devmode.js) which the tested code paths never
-// touch. Concatenated into one script so `let`/`const` cross-file references
-// resolve, exactly like separate <script> tags sharing a realm.
+// Load in the same dependency order as index.html. Concatenated into one
+// script so `let`/`const` cross-file references resolve, exactly like
+// separate <script> tags sharing a realm.
 const LOAD_ORDER = [
   'state.js',
   'util.js',
   'tasks.js',
-  'tests.js',
   'settings.js',
   'command-palette.js',
   'app.js',
@@ -225,13 +224,11 @@ function mkTask(overrides) {
     priority: 'Medium',
     time: 0,
     status: 'pending',
-    recurring: '',
   }, overrides);
 }
 
 beforeEach(() => {
   App.state.tasks = [];
-  App.state.tests = [];
   App.state.subjects = [
     { name: 'Math', color: '#818cf8' },
     { name: 'Science', color: '#34d399' },
@@ -239,7 +236,6 @@ beforeEach(() => {
     { name: 'Other', color: '#94a3b8' },
   ];
   App.state.activeFilter = 'All';
-  App.state.activeTestFilter = 'All';
   App.state.compactMode = false;
   setEl('search-input', { value: '' });
   setEl('sort-select', { value: 'created' });
@@ -312,43 +308,6 @@ describe('dates', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-//  GRADES
-// ═══════════════════════════════════════════════════════════════════════
-describe('grades', () => {
-  it('getScorePct rounds score / maxScore to a percentage', () => {
-    expect(g.getScorePct({ score: 92, maxScore: 100 })).toBe(92);
-    expect(g.getScorePct({ score: 7, maxScore: 8 })).toBe(88);
-    expect(g.getScorePct({ score: 1, maxScore: 3 })).toBe(33);
-  });
-
-  it('getScorePct treats missing or blank scores as ungraded', () => {
-    expect(g.getScorePct({ score: null, maxScore: 100 })).toBeNull();
-    expect(g.getScorePct({ score: undefined, maxScore: 100 })).toBeNull();
-    expect(g.getScorePct({ score: '', maxScore: 100 })).toBeNull();
-  });
-
-  it('getScorePct falls back to a 100-point scale', () => {
-    expect(g.getScorePct({ score: 85 })).toBe(85);
-  });
-
-  it('getLetterGrade maps the standard bands', () => {
-    expect(g.getLetterGrade(100)).toBe('A');
-    expect(g.getLetterGrade(90)).toBe('A');
-    expect(g.getLetterGrade(89)).toBe('B');
-    expect(g.getLetterGrade(80)).toBe('B');
-    expect(g.getLetterGrade(70)).toBe('C');
-    expect(g.getLetterGrade(60)).toBe('D');
-    expect(g.getLetterGrade(59)).toBe('F');
-    expect(g.getLetterGrade(0)).toBe('F');
-  });
-
-  it('getLetterGrade returns null when there is no score', () => {
-    expect(g.getLetterGrade(null)).toBeNull();
-    expect(g.getLetterGrade(undefined)).toBeNull();
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════
 //  SETTINGS HELPERS
 // ═══════════════════════════════════════════════════════════════════════
 describe('settings helpers', () => {
@@ -376,21 +335,19 @@ describe('state', () => {
     expect(ids.size).toBe(200);
   });
 
-  it('save() persists tasks, subjects, tests and settings', () => {
+  it('save() persists tasks, subjects and settings', () => {
     App.state.tasks = [mkTask({ title: 'Saved' })];
-    App.state.tests = [{ id: '_t', subject: 'Math', title: 'Quiz' }];
     g.save();
     expect(JSON.parse(storage.getItem('hw_tasks'))[0].title).toBe('Saved');
     expect(JSON.parse(storage.getItem('hw_subjects')).length).toBe(4);
-    expect(JSON.parse(storage.getItem('hw_tests'))[0].title).toBe('Quiz');
     expect(JSON.parse(storage.getItem('hw_settings'))).toBeTypeOf('object');
+    expect(storage.getItem('hw_tests')).toBeNull();
   });
 
   it('load() restores persisted tasks and subjects', () => {
     storage.setItem('hw_tasks', JSON.stringify([mkTask({ title: 'Restored' })]));
     storage.setItem('hw_subjects', JSON.stringify([{ name: 'Bio', color: '#000000' }]));
     storage.setItem('hw_settings', JSON.stringify({}));
-    storage.setItem('hw_tests', JSON.stringify([]));
     g.load();
     expect(App.state.tasks[0].title).toBe('Restored');
     expect(App.state.subjects[0].name).toBe('Bio');
@@ -400,6 +357,8 @@ describe('state', () => {
     const legacy = [
       'hw_quickadd_history', 'hw_custom_synonyms', 'hw_ai_provider',
       'hw_ai_model', 'hw_openrouter_key', 'hw_gemini_key',
+      'hw_tests', 'hw_starfield_state', 'hw_forest_state',
+      'hw_tree_state', 'hw_hold_keys', 'hw_auto_theme',
     ];
     for (const key of legacy) storage.setItem(key, 'leftover');
     // Keys the app still uses must survive the purge untouched.
@@ -418,11 +377,9 @@ describe('state', () => {
 
   it('load() survives corrupted JSON in storage', () => {
     storage.setItem('hw_tasks', '{not json');
-    storage.setItem('hw_tests', '{not json');
     storage.setItem('hw_settings', JSON.stringify({}));
     expect(() => g.load()).not.toThrow();
     expect(Array.isArray(App.state.tasks)).toBe(true);
-    expect(Array.isArray(App.state.tests)).toBe(true);
   });
 });
 
@@ -510,46 +467,6 @@ describe('tasks — filtering and sorting', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-//  RECURRING RESETS + PRUNING
-// ═══════════════════════════════════════════════════════════════════════
-describe('tasks — recurring resets', () => {
-  it('dailyReset reopens a daily task that was not checked today', () => {
-    App.state.tasks = [mkTask({ id: '_d', recurring: 'daily', status: 'done', lastCheckedDate: '2000-01-01' })];
-    g.dailyReset();
-    expect(App.state.tasks[0].status).toBe('pending');
-  });
-
-  it('dailyReset leaves a task checked today alone', () => {
-    App.state.tasks = [mkTask({ id: '_d', recurring: 'daily', status: 'done', lastCheckedDate: g.todayStr() })];
-    g.dailyReset();
-    expect(App.state.tasks[0].status).toBe('done');
-  });
-
-  it('dailyReset ignores non-recurring tasks', () => {
-    App.state.tasks = [mkTask({ id: '_n', status: 'done' })];
-    g.dailyReset();
-    expect(App.state.tasks[0].status).toBe('done');
-  });
-
-  it('weeklyReset reopens a weekly task last checked before this Monday', () => {
-    App.state.tasks = [mkTask({ id: '_w', recurring: 'weekly', status: 'done', lastCheckedDate: '2000-01-01' })];
-    g.weeklyReset();
-    expect(App.state.tasks[0].status).toBe('pending');
-  });
-
-  it('pruneCompletedPastDue deletes done, past-due, non-recurring tasks', () => {
-    App.state.tasks = [
-      mkTask({ id: '_old', status: 'done', due: '2000-01-01' }),
-      mkTask({ id: '_keep-open', status: 'pending', due: '2000-01-01' }),
-      mkTask({ id: '_keep-future', status: 'done', due: '2099-01-01' }),
-      mkTask({ id: '_keep-recurring', status: 'done', due: '2000-01-01', recurring: 'daily' }),
-    ];
-    g.pruneCompletedPastDue();
-    expect(App.state.tasks.map(t => t.id)).toEqual(['_keep-open', '_keep-future', '_keep-recurring']);
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════
 //  COMPLETION + UNDO
 // ═══════════════════════════════════════════════════════════════════════
 describe('tasks — completion and undo', () => {
@@ -569,16 +486,6 @@ describe('tasks — completion and undo', () => {
     g.toggleDone('_b');
     g.undoDelete();
     expect(App.state.tasks.map(t => t.title)).toEqual(['First', 'Second', 'Third']);
-  });
-
-  it('a daily streak increments when checking off on a consecutive day', () => {
-    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
-    App.state.tasks = [mkTask({
-      id: '_s', recurring: 'daily', streak: 3,
-      lastCheckedDate: yesterday.toISOString().split('T')[0],
-    })];
-    g.toggleDone('_s');
-    expect(App.state.lastDeleted.task.streak).toBe(4);
   });
 });
 
@@ -602,43 +509,6 @@ describe('task card rendering', () => {
     const card = g.buildCard(mkTask({ id: "x');alert(1);//" }), 0);
     expect(card.innerHTML).not.toContain("onclick=\"openEdit('x');");
     expect(card.innerHTML).toContain('&#39;');
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════
-//  EXPORTS
-// ═══════════════════════════════════════════════════════════════════════
-describe('exports', () => {
-  it('exportICS writes one VEVENT per pending dated task', () => {
-    App.state.tasks = [
-      mkTask({ id: '_a', title: 'Essay', subject: 'English', due: '2099-03-04', priority: 'High' }),
-      mkTask({ id: '_b', title: 'Done already', status: 'done', due: '2099-03-05' }),
-      mkTask({ id: '_c', title: 'No date' }),
-    ];
-    g.exportICS();
-    const ics = captured.blobs.at(-1).parts[0];
-    expect(ics).toContain('BEGIN:VCALENDAR');
-    expect(ics).toContain('SUMMARY:Essay — English');
-    expect(ics).toContain('DTSTART;VALUE=DATE:20990304');
-    expect(ics).toContain('PRIORITY:3');
-    expect(ics).toContain('END:VCALENDAR');
-    expect(ics.match(/BEGIN:VEVENT/g).length).toBe(1);
-  });
-
-  it('exportICS refuses when nothing is exportable', () => {
-    App.state.tasks = [mkTask({ status: 'done', due: '2099-01-01' })];
-    g.exportICS();
-    expect(captured.blobs.length).toBe(0);
-  });
-
-  it('exportCSV emits a data URI with a header row', () => {
-    App.state.tasks = [mkTask({ title: 'Quote " me', subject: 'Math', due: '2099-01-01' })];
-    g.exportCSV();
-    const href = captured.anchors.at(-1).href;
-    expect(href.startsWith('data:text/csv')).toBe(true);
-    const csv = decodeURIComponent(href.slice(href.indexOf(',') + 1));
-    expect(csv).toContain('Title,Subject,Priority');
-    expect(csv).toContain('"Quote "" me"');
   });
 });
 
@@ -678,16 +548,44 @@ describe('removed quick-add / parser / voice surface', () => {
   });
 
   it('keeps the manual add/edit task API intact', () => {
-    for (const key of ['openAddForm', 'saveTask', 'openEdit', 'toggleDone', 'deleteTask', 'openTestForm', 'saveTest']) {
+    for (const key of ['openAddForm', 'saveTask', 'openEdit', 'toggleDone', 'deleteTask', 'togglePin', 'undoDelete']) {
       expect(typeof App[key], `App.${key} should exist`).toBe('function');
+    }
+  });
+
+  it('no longer exposes the removed tests-tab / starfield / dev-mode API', () => {
+    const gone = [
+      'openTestForm', 'saveTest', 'deleteTest', 'renderTests', 'buildTestCard',
+      'setTestFilter', 'renderCountdown', 'populateTestSubjectSelect',
+      'openFlashcards', 'closeFlashcards', 'flipCard', 'fcNext', 'fcPrev',
+      'renderFlashcard', 'shuffleFlashcards', 'renderTestStats',
+      'getLetterGrade', 'getScorePct', 'switchTab',
+      'setFocus', 'setNightSky', 'exitFocus', 'toggleFocus', 'toggleNightSky',
+      'setHoldKey', 'resetHoldKeys', '_heldViewKeys', 'toggleAutoTheme',
+    ];
+    for (const key of gone) expect(App[key], `App.${key} should be gone`).toBeUndefined();
+  });
+
+  it('deletes the tests-tab, starfield, dev-mode and hold-key modules', () => {
+    for (const f of ['js/tests.js', 'js/gamification.js', 'js/devmode.js',
+                     'css/gamification.css', 'css/devmode.css']) {
+      expect(existsSync(resolve(process.cwd(), f)), `${f} should be deleted`).toBe(false);
     }
   });
 
   it('index.html loads no removed script and no CDN NLP bundle', () => {
     const html = readFileSync(resolve(process.cwd(), 'index.html'), 'utf8');
-    expect(html).not.toMatch(/js\/(parser|quickadd|voice|calendar|gradecalc)\.js/);
+    expect(html).not.toMatch(/js\/(parser|quickadd|voice|calendar|gradecalc|tests|gamification|devmode)\.js/);
     expect(html).not.toMatch(/chrono|compromise|jsdelivr/);
     expect(html).not.toMatch(/qa-input|qa-preview|qa-suggestions|voice-mic-btn/);
+  });
+
+  it('index.html keeps no removed tests-tab / starfield / dev-mode markup', () => {
+    const html = readFileSync(resolve(process.cwd(), 'index.html'), 'utf8');
+    expect(html).not.toMatch(/panel-tests|test-modal|tests-list|countdown-grid|flashcard-overlay|fc-card/);
+    expect(html).not.toMatch(/starfield|constellation|mode-exit-hint|dev-overlay|matrix-canvas/);
+    expect(html).not.toMatch(/hk-focus|hk-nightsky|hold-key-row|s-auto-theme/);
+    expect(html).not.toMatch(/gamification\.css|devmode\.css/);
   });
 
   it('index.html keeps no removed calendar / grade-calc / timer markup', () => {
@@ -700,8 +598,8 @@ describe('removed quick-add / parser / voice surface', () => {
 
   it('sw.js precaches no removed modules', () => {
     const sw = readFileSync(resolve(process.cwd(), 'sw.js'), 'utf8');
-    expect(sw).not.toMatch(/calendar\.js|gradecalc\.js/);
-    expect(sw).toContain("'hw-tracker-v6'");
+    expect(sw).not.toMatch(/calendar\.js|gradecalc\.js|tests\.js|gamification|devmode/);
+    expect(sw).toContain("'hw-tracker-v8'");
   });
 
   it('index.html only references script files that exist', () => {
@@ -756,5 +654,22 @@ describe('removed quick-add / parser / voice surface', () => {
     expect(csp).not.toContain('generativelanguage.googleapis.com');
     expect(csp).not.toContain('openrouter.ai');
     expect(csp).not.toContain('unsafe-eval');
+  });
+
+  it('no longer exposes the removed templates / subtasks / recurring / export API', () => {
+    const gone = [
+      'applyTemplate', 'saveAsTemplate', 'renderTemplateList',
+      'addSubtask', 'removeSubtask', 'renderSubtaskEditor', 'toggleSubtaskEditor',
+      'exportCSV', 'exportICS',
+      'dailyReset', 'weeklyReset', 'pruneCompletedPastDue',
+    ];
+    for (const key of gone) expect(App[key], `App.${key} should be gone`).toBeUndefined();
+  });
+
+  it('index.html keeps no removed templates / subtasks / recurring / export markup', () => {
+    const html = readFileSync(resolve(process.cwd(), 'index.html'), 'utf8');
+    expect(html).not.toMatch(/subtask-editor|new-subtask-input|subtask-list|Save as Template/);
+    expect(html).not.toMatch(/template-list|m-recurring/);
+    expect(html).not.toMatch(/exportCSV|exportICS/);
   });
 });

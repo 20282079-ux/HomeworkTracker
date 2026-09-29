@@ -16,7 +16,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="HW Tracker" />
-  <meta name="description" content="Track your assignments and tests with style — a beautiful, offline-ready homework planner" />
+  <meta name="description" content="Track your assignments with style — a beautiful, offline-ready homework planner" />
   <link rel="manifest" href="/manifest.json" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
@@ -25,8 +25,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/styles.css" />
-  <link rel="stylesheet" href="css/gamification.css" />
-  <link rel="stylesheet" href="css/devmode.css" />
 </head>
 <body>
 
@@ -34,9 +32,6 @@
   <a href="#main-content" class="skip-link">Skip to main content</a>
 
   <canvas id="confetti-canvas" aria-hidden="true"></canvas>
-
-  <!-- Dev Mode Trigger (triple-click title or Konami code) -->
-  <button class="dev-trigger-dot" onclick="DevMode.open()" title="..." aria-hidden="true"></button>
 
   <!-- Live region for dynamic announcements -->
   <div id="toast-container" role="log" aria-live="polite" aria-atomic="false"></div>
@@ -50,24 +45,18 @@
         <p class="header-sub" id="header-sub">Track your assignments with style</p>
       </div>
       <nav class="header-actions" aria-label="App actions">
-        <button class="btn btn-ghost btn-sm" onclick="App.showKeybindsHelp()" id="keybinds-hint-btn" title="Keyboard shortcuts: hold F for focus mode, N for night sky, Esc to close" aria-label="Keyboard shortcuts help">⌨ Shortcuts</button>
+        <button class="btn btn-ghost btn-sm" onclick="App.showKeybindsHelp()" id="keybinds-hint-btn" title="Keyboard shortcuts: N for new task, Ctrl+K for the command palette, Esc to close" aria-label="Keyboard shortcuts help">⌨ Shortcuts</button>
         <button class="btn btn-ghost btn-sm" onclick="App.toggleCompact()" id="compact-btn" title="Toggle compact view" aria-pressed="false">⊟ Compact</button>
         <button class="btn btn-ghost btn-sm" onclick="App.openSettings()" title="Customize settings">⚙ Customize</button>
         <button class="btn btn-primary" onclick="App.openAddForm()" id="add-btn">＋ Add Task</button>
       </nav>
     </header>
 
-    <!-- ═══ TAB NAVIGATION ═══ -->
-    <div class="tab-nav" role="tablist" aria-label="App sections">
-      <button class="tab-btn active" id="tab-hw" onclick="App.switchTab('hw')" role="tab" aria-selected="true" aria-controls="panel-hw">📚 Homework</button>
-      <button class="tab-btn" id="tab-tests" onclick="App.switchTab('tests')" role="tab" aria-selected="false" aria-controls="panel-tests">🧪 Tests</button>
-    </div>
-
     <!-- ═══ MAIN CONTENT ═══ -->
     <main id="main-content">
 
-      <!-- ══ HOMEWORK TAB ══ -->
-      <section id="panel-hw" class="tab-panel active" role="tabpanel" aria-labelledby="tab-hw">
+      <!-- ══ HOMEWORK PANEL ══ -->
+      <section id="panel-hw" class="tab-panel active" role="tabpanel" aria-label="Assignments">
 
         <!-- Stats -->
         <div class="stats-row" role="group" aria-label="Assignment statistics">
@@ -128,72 +117,7 @@
 
       </section>
 
-      <!-- ══ TESTS TAB ══ -->
-      <section id="panel-tests" class="tab-panel" role="tabpanel" aria-labelledby="tab-tests">
-
-        <!-- Upcoming Countdown -->
-        <div class="countdown-panel" id="countdown-panel">
-          <div class="countdown-title">⏳ Upcoming Tests</div>
-          <div class="countdown-grid" id="countdown-grid" aria-live="polite"></div>
-        </div>
-
-        <!-- Test Stats -->
-        <div class="test-stats-row" style="grid-template-columns:repeat(3,1fr)" role="group" aria-label="Test statistics">
-          <div class="stat-card">
-            <div class="stat-label">Total Tests</div>
-            <div class="stat-value accent" id="tstat-total">0</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Passed</div>
-            <div class="stat-value success" id="tstat-passed">0</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Upcoming</div>
-            <div class="stat-value warn" id="tstat-upcoming">0</div>
-          </div>
-        </div>
-
-        <!-- Test Toolbar -->
-        <div class="toolbar" style="margin-bottom:20px" role="search" aria-label="Filter and search tests">
-          <div class="filter-chips" id="test-filter-chips" role="group" aria-label="Test status filters">
-            <button class="chip active" data-filter="All" onclick="App.setTestFilter(this)">All</button>
-            <button class="chip" data-filter="upcoming" onclick="App.setTestFilter(this)">Upcoming</button>
-            <button class="chip" data-filter="passed" onclick="App.setTestFilter(this)">Passed</button>
-            <button class="chip" data-filter="failed" onclick="App.setTestFilter(this)">Failed</button>
-          </div>
-          <label for="test-search" class="sr-only">Search tests</label>
-          <input class="search-input" type="search" placeholder="🔍 Search tests…" oninput="App.renderTests()" id="test-search" aria-label="Search tests" />
-          <label for="test-sort" class="sr-only">Sort tests by</label>
-          <select class="sort-select" onchange="App.renderTests()" id="test-sort" aria-label="Sort tests">
-            <option value="created">Newest first</option>
-            <option value="date">Test date</option>
-            <option value="score">Score</option>
-            <option value="subject">Subject</option>
-          </select>
-          <button class="btn btn-ghost btn-sm" onclick="App.openFlashcards()">🃏 Flashcards</button>
-          <button class="btn btn-primary btn-sm" onclick="App.openTestForm()">＋ Add Test</button>
-        </div>
-
-        <!-- Tests list -->
-        <div id="tests-list" class="tasks-list" role="list" aria-label="Tests"></div>
-
-      </section>
-
     </main>
-  </div>
-
-  <!-- ═══ CONSTELLATION STARFIELD — slow-growing ambient sky ═══ -->
-  <div class="starfield" id="starfield"></div>
-
-  <!-- Constellation info panel — glassmorphism card bottom-right.
-       Lists all 5 constellations with metric progress when detail-mode is on. -->
-  <div id="constellation-panel" class="constellation-panel" aria-label="Constellation progress"></div>
-
-  <!-- Hold-mode hint — fades in whenever a view-mode hold key is active.
-       Note: there's no toggle. Press Escto force-clear, or just release the key. -->
-  <div id="mode-exit-hint" role="status" aria-live="polite">
-    Release key to exit ·
-    <kbd>Esc</kbd> force-clear
   </div>
 
   <!-- ═══ ADD/EDIT TASK MODAL ═══ -->
@@ -235,16 +159,6 @@
       </div>
       <div class="form-grid" style="margin-bottom:16px">
         <div class="field">
-          <label for="m-recurring">Recurring</label>
-          <select id="m-recurring">
-            <option value="">None</option>
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="biweekly">Bi-weekly</option>
-            <option value="monthly">Monthly</option>
-          </select>
-        </div>
-        <div class="field">
           <label for="m-status">Status</label>
           <select id="m-status">
             <option value="pending">Pending</option>
@@ -254,20 +168,6 @@
         </div>
       </div>
 
-      <!-- ★ SUBTASK EDITOR ★ -->
-      <div class="subtask-editor" aria-label="Subtasks">
-        <div class="subtask-editor-title">☑ Subtasks</div>
-        <div class="subtask-input-row">
-          <label for="new-subtask-input" class="sr-only">Add subtask</label>
-          <input type="text" id="new-subtask-input" placeholder="Add a subtask…" />
-          <button class="btn btn-primary btn-sm" onclick="App.addSubtask()" aria-label="Add subtask">Add</button>
-        </div>
-        <div class="subtask-list" id="subtask-list"></div>
-      </div>
-
-      <div style="margin-top:8px;margin-bottom:4px">
-        <button class="btn btn-ghost btn-sm" onclick="saveAsTemplate()" style="font-size:11px" title="Save this task as a reusable template">📋 Save as Template</button>
-      </div>
       <div class="form-actions">
         <button class="btn btn-ghost" onclick="App.closeModal()">Cancel</button>
         <button class="btn btn-primary" onclick="App.saveTask()">Save Task</button>
@@ -339,41 +239,13 @@
         </div>
       </div>
 
-      <!-- Templates -->
+      <!-- Sound -->
       <div class="settings-section">
-        <h3 class="settings-section-title">📋 Templates</h3>
-        <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Click a template to auto-fill the task form. Save your own from the task modal.</div>
-        <div id="template-list"></div>
-      </div>
-
-      <!-- Data & Export -->
-      <div class="settings-section">
-        <h3 class="settings-section-title">📤 Data &amp; Export</h3>
+        <h3 class="settings-section-title">🔊 Sound</h3>
         <div class="toggle-row">
           <label for="s-sound">Task-completion sound 🔊</label>
           <label class="toggle"><input type="checkbox" id="s-sound" onchange="App.toggleSoundFromSettings(this)"><span class="toggle-slider"></span></label>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
-          <button class="btn btn-ghost btn-sm" onclick="App.exportCSV()">↓ Export to CSV</button>
-          <button class="btn btn-ghost btn-sm" onclick="App.exportICS()">📅 Export to Calendar (.ics)</button>
-        </div>
-      </div>
-
-      <!-- App Settings -->
-      <div class="settings-section">
-        <h3 class="settings-section-title">⌨️ Hold-key shortcuts</h3>
-        <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Press and <strong>hold</strong> a key to enter that mode; release to return to your theme. Set both keys to <kbd>␣</kbd> (empty input) to disable.</div>
-        <div class="hold-key-row">
-          <label for="hk-focus">🌌 Focus</label>
-          <input type="text" id="hk-focus" maxlength="1" readonly value="f" onkeydown="event.preventDefault();if(event.key==='Backspace'||event.key==='Delete'){this.value='';App.setHoldKey('focus','');}else if(event.key.length===1&&!event.ctrlKey&&!event.metaKey&&!event.altKey){this.value=event.key.toLowerCase();App.setHoldKey('focus',event.key);}" />
-          <span class="hk-hint">hold to fade UI over current theme</span>
-        </div>
-        <div class="hold-key-row">
-          <label for="hk-nightsky">🌠 Night Sky</label>
-          <input type="text" id="hk-nightsky" maxlength="1" readonly value="n" onkeydown="event.preventDefault();if(event.key==='Backspace'||event.key==='Delete'){this.value='';App.setHoldKey('nightSky','');}else if(event.key.length===1&&!event.ctrlKey&&!event.metaKey&&!event.altKey){this.value=event.key.toLowerCase();App.setHoldKey('nightSky',event.key);}" />
-          <span class="hk-hint">hold for full night sky regardless of theme</span>
-        </div>
-        <button class="btn btn-ghost btn-sm" onclick="App.resetHoldKeys()" style="margin-top:6px">↺ Reset to defaults (F / N)</button>
       </div>
 
       <div class="settings-section">
@@ -393,10 +265,6 @@
         <div class="toggle-row">
           <label for="s-group">Group tasks by subject</label>
           <label class="toggle"><input type="checkbox" id="s-group" onchange="App.filterTasks()"><span class="toggle-slider"></span></label>
-        </div>
-        <div class="toggle-row">
-          <label for="s-auto-theme">🌓 Auto time-of-day theme (EST)</label>
-          <label class="toggle"><input type="checkbox" id="s-auto-theme" onchange="App.toggleAutoTheme(this)"><span class="toggle-slider"></span></label>
         </div>
         <div style="margin-top:8px">
           <label for="s-radius" style="font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--text3);font-weight:600;display:block;margin-bottom:8px">Border Radius: <span id="radius-val">14px</span></label>
@@ -423,136 +291,6 @@
     </div>
   </div>
 
-  <!-- ═══ ADD/EDIT TEST MODAL ═══ -->
-  <div id="test-modal" class="overlay hidden" onclick="App.closeTestModalOutside(event)" role="dialog" aria-modal="true" aria-labelledby="test-modal-title">
-    <div class="modal" id="test-modal-inner">
-      <h2 class="modal-title" id="test-modal-title">🧪 New Test</h2>
-      <div class="form-grid">
-        <div class="field">
-          <label for="t-title">Test / Exam Name *</label>
-          <input type="text" id="t-title" placeholder="e.g. Math Test 6/19" required aria-required="true" />
-        </div>
-        <div class="field">
-          <label for="t-subject">Subject</label>
-          <select id="t-subject"></select>
-        </div>
-      </div>
-      <div class="form-grid">
-        <div class="field">
-          <label for="t-date">Test Date</label>
-          <input type="date" id="t-date" />
-        </div>
-        <div class="field">
-          <label for="t-type">Type</label>
-          <select id="t-type">
-            <option value="Quiz">Quiz</option>
-            <option value="Test">Test</option>
-            <option value="Midterm">Midterm</option>
-            <option value="Final">Final</option>
-            <option value="Project">Project</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-grid" style="margin-bottom:12px">
-        <div class="field">
-          <label for="t-score">Score (%)</label>
-          <input type="number" id="t-score" placeholder="e.g. 87" min="0" max="100" />
-        </div>
-        <div class="field">
-          <label for="t-maxscore">Max Score (optional)</label>
-          <input type="number" id="t-maxscore" placeholder="e.g. 100" min="1" />
-        </div>
-      </div>
-      <div class="field" style="margin-bottom:16px">
-        <label for="t-notes">Notes</label>
-        <textarea id="t-notes" placeholder="Topics covered, what to review…"></textarea>
-      </div>
-      <div class="form-actions">
-        <button class="btn btn-ghost" onclick="App.closeTestModal()">Cancel</button>
-        <button class="btn btn-primary" onclick="App.saveTest()">Save Test</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ★ SECRET DEV MODE ★ -->
-  <div id="dev-overlay" class="dev-overlay hidden">
-    <div class="dev-modal">
-      <canvas id="matrix-canvas"></canvas>
-      <div class="dev-header">
-        <h2>🖥️ Dev Console</h2>
-        <div class="dev-status">LIVE</div>
-        <button class="btn btn-ghost btn-sm dev-close-btn" onclick="DevMode.close()" aria-label="Close dev panel">✕</button>
-      </div>
-      <div class="dev-body">
-
-        <!-- Current Stats -->
-        <div class="dev-section">
-          <div class="dev-section-title">📊 Current State</div>
-          <div id="dev-stats-info"></div>
-        </div>
-
-        <!-- Coins -->
-        <div class="dev-section">
-          <div class="dev-section-title">🪙 Coins</div>
-          <div class="dev-input-row">
-            <input type="number" class="dev-input" id="dev-coin-amount" placeholder="Amount..." value="1000" />
-            <button class="dev-btn" onclick="DevMode.addCoins(document.getElementById('dev-coin-amount').value)">+ Add</button>
-          </div>
-        </div>
-
-        <!-- Speed -->
-        <div class="dev-section">
-          <div class="dev-section-title">⚡ Timer Speed</div>
-          <div style="display:flex;align-items:center;gap:12px">
-            <input type="range" class="dev-speed-slider" id="dev-speed-slider" min="1" max="100" value="1" oninput="DevMode.setSpeed(this.value)" />
-            <span class="dev-speed-val" id="dev-speed-val">1x</span>
-          </div>
-          <button class="dev-btn" onclick="DevMode.resetSpeed()" style="margin-top:6px">↺ Reset Speed</button>
-        </div>
-
-        <!-- Quick Actions -->
-        <div class="dev-section">
-          <div class="dev-section-title">⚡ Quick Actions</div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px">
-            <button class="dev-btn" onclick="DevMode.instantComplete()">⚡ Instant Complete</button>
-            <button class="dev-btn" onclick="DevMode.unlockAllSpecies()">🌟 Unlock All Species</button>
-            <button class="dev-btn" onclick="DevMode.maxStats()">👑 Max All Stats</button>
-            <button class="dev-btn warn" onclick="DevMode.fillGarden(20)">🌿 Add 20 Trees</button>
-            <button class="dev-btn warn" onclick="DevMode.fillGarden(50)">🌳 Add 50 Trees</button>
-          </div>
-        </div>
-
-        <!-- Easter Eggs -->
-        <div class="dev-section">
-          <div class="dev-section-title">🥚 Easter Eggs</div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px">
-            <button class="dev-btn" onclick="DevMode.partyMode()">🎉 Party Mode</button>
-            <button class="dev-btn" onclick="DevMode.matrixMode()">🟢 Matrix Mode</button>
-            <button class="dev-btn" onclick="DevMode.glitchTitle()">⚠️ Glitch Title</button>
-          </div>
-          <div class="dev-console" style="margin-top:10px">
-            <div style="font-size:10px;color:#00ff41;margin-bottom:6px;opacity:0.5">&gt; Type a command (try "help"):</div>
-            <input type="text" class="dev-console-input" id="dev-console-input" placeholder="$ " onkeydown="if(event.key==='Enter'){DevMode.secretConsole(this.value);this.value='';}" />
-          </div>
-        </div>
-
-        <!-- Achievements -->
-        <div class="dev-section">
-          <div class="dev-section-title">🏆 Dev Achievements</div>
-          <div class="dev-achievements-grid" id="dev-achievements"></div>
-        </div>
-
-        <!-- Danger Zone -->
-        <div class="dev-section">
-          <div class="dev-section-title" style="color:#ff4141">⚠️ Danger Zone</div>
-          <button class="dev-btn danger" onclick="DevMode.resetAllData()">🗑 Reset All Gamification Data</button>
-        </div>
-
-      </div>
-    </div>
-  </div>
-
   <!-- ═══ COMMAND PALETTE ═══ -->
   <div id="command-palette" class="cmd-palette-overlay hidden" role="dialog" aria-modal="true" aria-label="Command palette">
     <div class="cmd-palette-modal">
@@ -570,47 +308,10 @@
     </div>
   </div>
 
-  <!-- ═══ FLASHCARD MODAL ═══ -->
-  <div id="flashcard-overlay" class="flashcard-overlay hidden" onclick="App.closeFlashcardsOutside(event)" role="dialog" aria-modal="true" aria-label="Flashcard review">
-    <div class="flashcard-modal">
-      <div class="flashcard-header">
-        <h2 style="font-family:var(--font-head);font-size:16px;font-weight:800">🃏 Flashcard Review</h2>
-        <div style="display:flex;gap:8px;align-items:center">
-          <span class="flashcard-progress" id="fc-progress" aria-live="polite">1 / 5</span>
-          <button class="btn btn-ghost btn-sm" onclick="App.closeFlashcards()" aria-label="Close flashcards">✕</button>
-        </div>
-      </div>
-      <div class="fc-scene" onclick="App.flipCard()" role="button" tabindex="0" aria-label="Click to flip flashcard" onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();App.flipCard();}">
-        <div class="fc-card" id="fc-card">
-          <div class="fc-face fc-front">
-            <div class="fc-face-label">Test</div>
-            <div class="fc-face-text" id="fc-front-text">Test Name</div>
-            <div style="font-size:11px;color:var(--text3);margin-top:8px" id="fc-front-sub">Subject • Type</div>
-          </div>
-          <div class="fc-face fc-back">
-            <div class="fc-face-label">Score</div>
-            <div class="fc-face-score" id="fc-back-score" style="color:var(--success)">A</div>
-            <div id="fc-back-pct" style="font-size:14px;color:var(--text2);font-weight:600"></div>
-            <div id="fc-back-notes" style="font-size:12px;color:var(--text2);margin-top:8px;max-height:60px;overflow:auto"></div>
-          </div>
-        </div>
-      </div>
-      <p class="fc-hint">Click card to flip • Use arrows to navigate</p>
-      <div class="fc-nav" style="margin-top:14px">
-        <button class="btn btn-ghost" onclick="App.fcPrev()" aria-label="Previous flashcard">← Prev</button>
-        <button class="btn btn-ghost btn-sm" onclick="App.shuffleFlashcards()" title="Shuffle" aria-label="Shuffle flashcards">🔀</button>
-        <button class="btn btn-ghost" onclick="App.fcNext()" aria-label="Next flashcard">Next →</button>
-      </div>
-    </div>
-  </div>
-
   <!-- ═══ MODULAR JS LOAD ORDER ═══ -->
-  <script src="js/gamification.js"></script>
-  <script src="js/devmode.js"></script>
   <script src="js/state.js"></script>
   <script src="js/util.js"></script>
   <script src="js/tasks.js"></script>
-  <script src="js/tests.js"></script>
   <script src="js/settings.js"></script>
   <script src="js/command-palette.js"></script>
   <script src="js/app.js"></script>
