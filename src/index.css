@@ -326,10 +326,59 @@ html.theme-dusk body::before {
 html.theme-light .task-card,
 html.theme-light .stat-card,
 html.theme-light .subject-item {
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
+  box-shadow: 0 1px 3px rgba(15,23,42,0.08), 0 2px 8px rgba(15,23,42,0.05);
 }
 html.theme-light .task-card:hover {
-  box-shadow: 0 4px 16px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06);
+  box-shadow: 0 6px 20px rgba(15,23,42,0.12), 0 2px 6px rgba(15,23,42,0.06);
+}
+/* Light-theme text & chrome legibility: badges, notes, buttons, inputs and
+   modals were tuned for the dark themes — restore ink-dark text and solid
+   surfaces so contrast stays WCAG-friendly on white cards. */
+html.theme-light .task-note,
+html.theme-light .toggle-row label,
+html.theme-light .color-row label,
+html.theme-light .stat-label,
+html.theme-light .header-sub,
+html.theme-light .group-header {
+  color: var(--text2);
+}
+html.theme-light .btn-ghost {
+  background: var(--bg2);
+  color: var(--text2);
+}
+html.theme-light .btn-ghost:hover {
+  color: var(--accent);
+}
+html.theme-light .field input,
+html.theme-light .field select,
+html.theme-light .field textarea,
+html.theme-light .search-input,
+html.theme-light .sort-select,
+html.theme-light .subject-item input[type="text"] {
+  background: var(--bg2);
+  color: var(--text);
+}
+html.theme-light .field select option {
+  background: var(--bg2);
+  color: var(--text);
+}
+html.theme-light .modal,
+html.theme-light .cmd-palette-modal {
+  box-shadow: 0 24px 70px rgba(15,23,42,0.22), 0 0 0 1px rgba(15,23,42,0.04);
+}
+html.theme-light .overlay {
+  background: rgba(15,23,42,0.38);
+}
+html.theme-light .toast {
+  background: var(--bg2);
+  color: var(--text);
+  box-shadow: 0 8px 30px rgba(15,23,42,0.16);
+}
+html.theme-light .task-checkbox {
+  border-color: #b6c2d6;
+}
+html.theme-light .empty-state {
+  color: var(--text3);
 }
 /* ── Daytime card elevation ──
    Same white-cards-on-tinted-bg model as light theme. Daytime background

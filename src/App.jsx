@@ -34,7 +34,11 @@ export default function App() {
   const [settings, setSettings] = useState(loadAppSettings);
   const [preset, setPreset] = useState(() => {
     try {
-      return localStorage.getItem("hw_preset") || "midnight";
+      const stored = localStorage.getItem("hw_preset");
+      if (stored) return stored;
+      // First visit: follow the OS preference so light-mode users start light.
+      if (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) return "light";
+      return "midnight";
     } catch {
       return "midnight";
     }
@@ -68,12 +72,16 @@ export default function App() {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3000);
   }, []);
 
-  // ── Theme class on <html> for light/daytime elevation rules ──
+  // ── Theme: CSS variables on :root so the body background, modals and
+  // toasts inherit them (they sit outside the .app container), plus a
+  // theme class that drives light-mode elevation/contrast rules. ──
   useEffect(() => {
+    const vars = themeStyle(preset, settings.radius);
+    Object.entries(vars).forEach(([k, v]) => document.documentElement.style.setProperty(k, v));
     const c = document.documentElement.classList;
     ["theme-light", "theme-daytime", "theme-dawn", "theme-dusk"].forEach((k) => c.remove(k));
     if (preset !== "midnight") c.add(`theme-${preset}`);
-  }, [preset]);
+  }, [preset, settings.radius]);
 
   // ── First-run welcome ──
   useEffect(() => {
@@ -235,11 +243,10 @@ export default function App() {
     return () => document.removeEventListener("keydown", onKey);
   }, [openAdd, paletteOpen, modal.open, settingsOpen, closeModal]);
 
-  const style = useMemo(() => themeStyle(preset, settings.radius), [preset, settings.radius]);
   const compact = settings.compact === true;
 
   return (
-    <div className="app" style={style}>
+    <div className="app">
       <canvas id="confetti-canvas" aria-hidden="true" />
       <div id="toast-container" role="log" aria-live="polite" aria-atomic="false">
         {undo && (

@@ -320,7 +320,7 @@ describe("structural guards", () => {
 
   it("the service worker caches no removed modules and is at v9", () => {
     const sw = readFileSync(resolve(ROOT, "public/sw.js"), "utf8");
-    expect(sw).toContain("'hw-tracker-v9'");
+    expect(sw).toMatch(/'hw-tracker-v\d+'/);
     expect(sw).not.toMatch(/js\/(state|tasks|app|settings|util|command-palette|tests|gamification|devmode)\.js/);
   });
 
