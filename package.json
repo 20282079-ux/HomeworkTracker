@@ -1,22 +1,26 @@
 {
   "name": "homework-tracker",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
-  "description": "Offline-ready homework assignment and test tracker (static PWA)",
+  "description": "Offline-ready homework assignment tracker (Vite + React PWA)",
   "type": "module",
   "scripts": {
-    "start": "node scripts/serve.mjs",
-    "serve": "node scripts/serve.mjs",
-    "build": "node scripts/build.mjs",
+    "dev": "vite",
+    "preview": "vite preview",
+    "build": "vite build",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "icons": "node scripts/generate-icons.mjs"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
   "devDependencies": {
+    "@vitejs/plugin-react": "^5.1.1",
+    "jsdom": "^30.1.1",
+    "vite": "^7.1.9",
     "vitest": "^4.1.9"
   }
 }

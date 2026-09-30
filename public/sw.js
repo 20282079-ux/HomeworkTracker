@@ -8,11 +8,11 @@
 // worker activate immediately; app.js still toasts to prompt a refresh so the
 // in-memory state is rebuilt from the new scripts.
 
-var CACHE_NAME = 'hw-tracker-v8';
+var CACHE_NAME = 'hw-tracker-v9';
 
-// Every same-origin asset needed to boot the app. Keep this in sync with the
-// <link>/<script> tags in index.html — a missing script here means the app
-// silently loses a feature when started offline.
+// Core shell entries. JS/CSS bundles built by Vite are hashed, so they are
+// cached on demand by the fetch handler (stale-while-revalidate) instead of
+// being listed here.
 var APP_SHELL = [
   '/',
   '/index.html',
@@ -21,13 +21,6 @@ var APP_SHELL = [
   '/icon-192.png',
   '/icon-512.png',
   '/apple-touch-icon.png',
-  '/css/styles.css',
-  '/js/state.js',
-  '/js/util.js',
-  '/js/tasks.js',
-  '/js/settings.js',
-  '/js/command-palette.js',
-  '/js/app.js',
 ];
 
 // Third-party assets the app needs in order to run fully offline. The only
