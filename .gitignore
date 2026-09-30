@@ -11,6 +11,7 @@ Thumbs.db
 .vite/
 coverage/
 dist/
+isolate/
 
 # Environment secrets
 .env
