@@ -54,7 +54,6 @@ export default function App() {
   const [toasts, setToasts] = useState([]);
   const [undo, setUndo] = useState(null); // { task, index, timer }
   const searchRef = useRef(null);
-  const titleRef = useRef(null);
 
   // ── Persistence ──
   useEffect(() => {
@@ -189,6 +188,10 @@ export default function App() {
     [subjects]
   );
 
+  const updateSubject = useCallback((i, patch) => {
+    setSubjects((s) => s.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
+  }, []);
+
   // ── Derived data ──
   const stats = useMemo(() => computeStats(tasks), [tasks]);
   const groups = useMemo(
@@ -228,15 +231,18 @@ export default function App() {
         setPaletteOpen((o) => !o);
         return;
       }
+      // Escape always closes the topmost layer, even while typing in a field.
+      if (e.key === "Escape") {
+        if (paletteOpen) setPaletteOpen(false);
+        else if (modal.open) closeModal();
+        else if (settingsOpen) setSettingsOpen(false);
+        return;
+      }
       const inField = !!(e.target && typeof e.target.matches === "function" && e.target.matches("input,textarea,select,[contenteditable]"));
       if (inField) return;
       if (e.key === "n" || e.key === "N") {
         e.preventDefault();
         openAdd();
-      } else if (e.key === "Escape") {
-        if (paletteOpen) setPaletteOpen(false);
-        else if (modal.open) closeModal();
-        else if (settingsOpen) setSettingsOpen(false);
       }
     };
     document.addEventListener("keydown", onKey);
@@ -381,7 +387,7 @@ export default function App() {
                 g.subject === null ? (
                   g.items.map((t, i) => <TaskCard key={t.id} task={t} index={i} compact={compact} subject={subjectByName[t.subject] || { color: "#7c6af7" }} onEdit={openEdit} onDelete={completeAndRemove} onToggle={completeAndRemove} onPin={togglePin} />)
                 ) : (
-                  <div key={g.subject}>
+                  <div key={g.subject} role="group" aria-label={g.subject}>
                     <div className="group-header">
                       <span style={{ color: (subjectByName[g.subject] || {}).color || "#fff" }}>{g.subject}</span> <span style={{ opacity: 0.4 }}>({g.items.length})</span>
                     </div>
@@ -416,9 +422,10 @@ export default function App() {
           subjects={subjects}
           addSubject={addSubject}
           removeSubject={removeSubject}
+          onUpdateSubject={updateSubject}
           onClose={() => setSettingsOpen(false)}
           onClearAll={clearAll}
-          soundEnabled={soundEnabled()}
+          soundOn={soundEnabled()}
           onToggleSound={() => {
             toggleSound();
             setSettings((s) => ({ ...s, sound: soundEnabled() }));

@@ -218,10 +218,11 @@ describe("storage", () => {
     expect(defaults.showDone).toBe(true);
     expect(defaults.confetti).toBe(true);
     expect(defaults.groupBySubject).toBe(false);
-    saveAppSettings({ ...defaults, showDone: false, title: "My Planner" });
+    saveAppSettings({ ...defaults, showDone: false, title: "My Planner", compact: true });
     const loaded = loadAppSettings();
     expect(loaded.showDone).toBe(false);
     expect(loaded.title).toBe("My Planner");
+    expect(loaded.compact).toBe(true);
   });
 });
 

@@ -212,6 +212,12 @@ html.theme-dusk body::before {
 .btn-danger:hover { background: rgba(248,113,113,0.25); }
 .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 8px; min-height: 40px; }
 
+/* Active theme preset in the Customize modal */
+.preset-active {
+  border-color: var(--accent) !important; color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
 /* ── STATS ROW ── */
 .stats-row {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-sm); margin-bottom: var(--space-xl);
@@ -333,52 +339,70 @@ html.theme-light .task-card:hover {
 }
 /* Light-theme text & chrome legibility: badges, notes, buttons, inputs and
    modals were tuned for the dark themes — restore ink-dark text and solid
-   surfaces so contrast stays WCAG-friendly on white cards. */
-html.theme-light .task-note,
-html.theme-light .toggle-row label,
-html.theme-light .color-row label,
-html.theme-light .stat-label,
-html.theme-light .header-sub,
-html.theme-light .group-header {
+   surfaces so contrast stays WCAG-friendly on the light themes
+   (light, daytime, dawn). */
+html:is(.theme-light, .theme-daytime, .theme-dawn) .task-note,
+html:is(.theme-light, .theme-daytime, .theme-dawn) .toggle-row label,
+html:is(.theme-light, .theme-daytime, .theme-dawn) .color-row label,
+html:is(.theme-light, .theme-daytime, .theme-dawn) .stat-label,
+html:is(.theme-light, .theme-daytime, .theme-dawn) .header-sub,
+html:is(.theme-light, .theme-daytime, .theme-dawn) .group-header {
   color: var(--text2);
 }
-html.theme-light .btn-ghost {
+html:is(.theme-light, .theme-daytime, .theme-dawn) .btn-ghost {
   background: var(--bg2);
   color: var(--text2);
 }
-html.theme-light .btn-ghost:hover {
+html:is(.theme-light, .theme-daytime, .theme-dawn) .btn-ghost:hover {
   color: var(--accent);
 }
-html.theme-light .field input,
-html.theme-light .field select,
-html.theme-light .field textarea,
-html.theme-light .search-input,
-html.theme-light .sort-select,
-html.theme-light .subject-item input[type="text"] {
+html:is(.theme-light, .theme-daytime, .theme-dawn) .field input,
+html:is(.theme-light, .theme-daytime, .theme-dawn) .field select,
+html:is(.theme-light, .theme-daytime, .theme-dawn) .field textarea,
+html:is(.theme-light, .theme-daytime, .theme-dawn) .search-input,
+html:is(.theme-light, .theme-daytime, .theme-dawn) .sort-select,
+html:is(.theme-light, .theme-daytime, .theme-dawn) .subject-item input[type="text"] {
   background: var(--bg2);
   color: var(--text);
 }
-html.theme-light .field select option {
+html:is(.theme-light, .theme-daytime, .theme-dawn) .field select option {
   background: var(--bg2);
   color: var(--text);
 }
-html.theme-light .modal,
-html.theme-light .cmd-palette-modal {
+html:is(.theme-light, .theme-daytime, .theme-dawn) .modal,
+html:is(.theme-light, .theme-daytime, .theme-dawn) .cmd-palette-modal {
   box-shadow: 0 24px 70px rgba(15,23,42,0.22), 0 0 0 1px rgba(15,23,42,0.04);
 }
-html.theme-light .overlay {
+html:is(.theme-light, .theme-daytime, .theme-dawn) .overlay {
   background: rgba(15,23,42,0.38);
 }
-html.theme-light .toast {
+html:is(.theme-light, .theme-daytime, .theme-dawn) .toast {
   background: var(--bg2);
   color: var(--text);
   box-shadow: 0 8px 30px rgba(15,23,42,0.16);
 }
-html.theme-light .task-checkbox {
+html:is(.theme-light, .theme-daytime, .theme-dawn) .task-checkbox {
   border-color: #b6c2d6;
 }
-html.theme-light .empty-state {
+html:is(.theme-light, .theme-daytime, .theme-dawn) .empty-state {
   color: var(--text3);
+}
+/* Badge inks: the default badge colors were tuned for dark surfaces and
+   wash out on white/warm cards — swap in darker inks per light theme. */
+html:is(.theme-light, .theme-daytime, .theme-dawn) .badge-priority-Low {
+  color: #15803d; border-color: rgba(21,128,61,0.35);
+}
+html:is(.theme-light, .theme-daytime, .theme-dawn) .badge-priority-Medium,
+html:is(.theme-light, .theme-daytime, .theme-dawn) .badge-soon {
+  color: #a16207; border-color: rgba(161,98,7,0.35);
+}
+html:is(.theme-light, .theme-daytime, .theme-dawn) .badge-priority-High,
+html:is(.theme-light, .theme-daytime, .theme-dawn) .badge-today {
+  color: #c2410c; border-color: rgba(194,65,12,0.35);
+}
+html:is(.theme-light, .theme-daytime, .theme-dawn) .badge-priority-Urgent,
+html:is(.theme-light, .theme-daytime, .theme-dawn) .badge-overdue {
+  color: #b91c1c; border-color: rgba(185,28,28,0.35);
 }
 /* ── Daytime card elevation ──
    Same white-cards-on-tinted-bg model as light theme. Daytime background
@@ -391,6 +415,17 @@ html.theme-daytime .subject-item {
 html.theme-daytime .task-card:hover {
   box-shadow: 0 4px 16px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06);
 }
+/* ── Dawn card elevation ──
+   Warm cream cards (#fdf0d5) on a lighter cream background (#fef7ed) —
+   a warm-tinted shadow keeps them floating without going gray. */
+html.theme-dawn .task-card,
+html.theme-dawn .stat-card,
+html.theme-dawn .subject-item {
+  box-shadow: 0 1px 3px rgba(120,72,20,0.10), 0 2px 8px rgba(120,72,20,0.06);
+}
+html.theme-dawn .task-card:hover {
+  box-shadow: 0 6px 20px rgba(120,72,20,0.14), 0 2px 6px rgba(120,72,20,0.07);
+}
 
 /* ── left accent strip ── */
 .task-strip {
@@ -402,6 +437,7 @@ html.theme-daytime .task-card:hover {
   width: 24px; height: 24px; border-radius: 7px;
   border: 2px solid var(--border); background: transparent;
   cursor: pointer; flex-shrink: 0; margin-top: 2px;
+  padding: 0; font: inherit; /* it is a <button> now */
   display: flex; align-items: center; justify-content: center;
   transition: all var(--transition);
 }

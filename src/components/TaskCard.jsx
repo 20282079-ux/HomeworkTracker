@@ -28,16 +28,30 @@ export default function TaskCard({ task, index, compact, subject, onEdit, onDele
   }
 
   return (
-    <div className={`task-card${isDone ? " done" : ""}${isOverdue ? " overdue" : ""}${isSoon && !isOverdue ? " due-soon" : ""}${compact ? " compact" : ""}${task.pinned ? " pinned" : ""}`} style={{ animationDelay: `${index * 0.04}s` }}>
-      <div className="task-strip" style={{ background: subj.color }} />
-      <button className={`star-btn${task.pinned ? " starred" : ""}`} onClick={() => onPin(task.id)} title={task.pinned ? "Unpin" : "Pin task"}>
+    <div className={`task-card${isDone ? " done" : ""}${isOverdue ? " overdue" : ""}${isSoon && !isOverdue ? " due-soon" : ""}${compact ? " compact" : ""}${task.pinned ? " pinned" : ""}`} style={{ animationDelay: `${index * 0.04}s` }} role="listitem">
+      <div className="task-strip" style={{ background: subj.color }} aria-hidden="true" />
+      <button
+        type="button"
+        className={`star-btn${task.pinned ? " starred" : ""}`}
+        onClick={() => onPin(task.id)}
+        title={task.pinned ? "Unpin" : "Pin task"}
+        aria-label={task.pinned ? `Unpin \"${task.title}\"` : `Pin \"${task.title}\"`}
+        aria-pressed={!!task.pinned}
+      >
         {task.pinned ? "⭐" : "☆"}
       </button>
-      <div className={`task-checkbox${isDone ? " checked" : ""}`} onClick={() => onToggle(task.id)}>
-        <svg width="12" height="9" viewBox="0 0 12 9" fill="none">
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={isDone}
+        className={`task-checkbox${isDone ? " checked" : ""}`}
+        onClick={() => onToggle(task.id)}
+        aria-label={`Mark \"${task.title}\" complete`}
+      >
+        <svg width="12" height="9" viewBox="0 0 12 9" fill="none" aria-hidden="true">
           <path d="M1 4L4.5 7.5L11 1" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-      </div>
+      </button>
       <div className="task-body">
         <div className="task-title">{task.title}</div>
         {task.notes ? <div className="task-note">{task.notes}</div> : null}
@@ -56,12 +70,12 @@ export default function TaskCard({ task, index, compact, subject, onEdit, onDele
         </div>
       </div>
       <div className="task-actions">
-        <button className="task-act-btn edit" onClick={() => onEdit(task.id)} title="Edit">
+        <button type="button" className="task-act-btn edit" onClick={() => onEdit(task.id)} title="Edit" aria-label={`Edit \"${task.title}\"`}>
           ✎
         </button>
-        <button className="task-act-btn del" onClick={() => onDelete(task.id)} title="Delete">
+        <button type="button" className="task-act-btn del" onClick={() => onDelete(task.id)} title="Delete" aria-label={`Delete \"${task.title}\"`}>
           ✕
-          </button>
+        </button>
       </div>
     </div>
   );

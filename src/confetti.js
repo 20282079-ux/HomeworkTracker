@@ -1,5 +1,11 @@
 // confetti.js — canvas particle burst, ported verbatim from js/util.js.
 export function launchConfetti() {
+  // Respect the OS "reduce motion" preference — skip the burst entirely.
+  try {
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  } catch {
+    /* matchMedia unavailable — play it anyway */
+  }
   const canvas = document.getElementById("confetti-canvas");
   const ctx = canvas.getContext("2d");
   canvas.width = window.innerWidth;

@@ -8,7 +8,7 @@
 // worker activate immediately; app.js still toasts to prompt a refresh so the
 // in-memory state is rebuilt from the new scripts.
 
-var CACHE_NAME = 'hw-tracker-v10';
+var CACHE_NAME = 'hw-tracker-v11';
 
 // Core shell entries. JS/CSS bundles built by Vite are hashed, so they are
 // cached on demand by the fetch handler (stale-while-revalidate) instead of

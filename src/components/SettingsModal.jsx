@@ -11,7 +11,7 @@ const PRESET_LIST = [
   ["coffee", "☕ Coffee"],
 ];
 
-export default function SettingsModal({ settings, setSettings, preset, applyPreset, subjects, addSubject, removeSubject, onClose, onClearAll, soundOn, onToggleSound }) {
+export default function SettingsModal({ settings, setSettings, preset, applyPreset, subjects, addSubject, removeSubject, onUpdateSubject, onClose, onClearAll, soundOn, onToggleSound }) {
   const [newSubject, setNewSubject] = useState("");
   const [newColor, setNewColor] = useState("#7c6af7");
 
@@ -22,12 +22,7 @@ export default function SettingsModal({ settings, setSettings, preset, applyPres
     setNewSubject("");
   };
 
-  const updateSubject = (i, patch) => {
-    subjects[i] = { ...subjects[i], ...patch };
-    setSubjects(subjects);
-  };
-  // NOTE: setSubjects comes from App through subjects state; we mutate via a
-  // copy so React sees a fresh array. Simpler: pass updateSubject from App.
+  const updateSubject = (i, patch) => onUpdateSubject(i, patch);
 
   return (
     <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()} role="dialog" aria-modal="true" aria-label="Customize settings">

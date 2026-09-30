@@ -71,6 +71,7 @@ export function loadAppSettings() {
     showDone: s.showDone !== false,
     groupBySubject: s.groupBySubject === true,
     confetti: s.confetti !== false,
+    compact: s.compact === true,
     sound: localStorage.getItem("hw_sound_enabled") !== "0",
     title: s.title || "Homework Tracker",
     radius: typeof s.radius === "number" ? s.radius : 14,
