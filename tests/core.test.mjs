@@ -18,6 +18,7 @@ const { computeStats, filterAndSortTasks, getDaysLeft, formatDate, todayStr, soo
 const { DEFAULT_SUBJECTS, loadAll, uid, loadAppSettings, saveAppSettings } = await import("../src/storage.js");
 const { PRESETS, themeStyle } = await import("../src/theme.js");
 const { cmdFuzzyScore, filterCommands } = await import("../src/commands.js");
+const { mergeBoards, snapshot } = await import("../src/sync.js");
 
 let counter = 0;
 function mkTask(overrides) {
@@ -273,6 +274,59 @@ describe("command palette", () => {
     expect(filterCommands(commands, "theme").map((c) => c.id)).toEqual(["b"]);
     expect(filterCommands(commands, "").length).toBe(3);
     expect(filterCommands(commands, "zzz").length).toBe(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+//  CLOUD SYNC MERGE
+// ═══════════════════════════════════════════════════════════════════════
+describe("cloud sync merge", () => {
+  it("snapshot only covers the synced collections", () => {
+    const board = { tasks: [mkTask({ id: "a" })], subjects: [{ name: "Math", color: "#fff" }], settings: { showDone: true } };
+    const withServerField = { ...board, updatedAt: 12345 };
+    expect(snapshot(board)).toBe(snapshot(withServerField));
+    expect(snapshot(board)).not.toBe(snapshot({ ...board, settings: { showDone: false } }));
+  });
+
+  it("unions tasks by id without losing either side", () => {
+    const local = { tasks: [mkTask({ id: "local1", title: "Only local" }), mkTask({ id: "both", title: "Local copy" })], subjects: [], settings: {} };
+    const remote = { tasks: [mkTask({ id: "remote1", title: "Only remote" }), mkTask({ id: "both", title: "Remote copy" })], subjects: [], settings: {} };
+    const merged = mergeBoards(local, remote);
+    expect(merged.tasks.map((t) => t.id).sort()).toEqual(["both", "local1", "remote1"]);
+    // Remote is the shared copy and wins on conflicts.
+    expect(merged.tasks.find((t) => t.id === "both").title).toBe("Remote copy");
+  });
+
+  it("preserves local completion and pinning on conflicting tasks", () => {
+    const local = { tasks: [mkTask({ id: "x", status: "done", pinned: true })], subjects: [], settings: {} };
+    const remote = { tasks: [mkTask({ id: "x", status: "pending", title: "Remote" })], subjects: [], settings: {} };
+    const merged = mergeBoards(local, remote);
+    expect(merged.tasks[0].status).toBe("done");
+    expect(merged.tasks[0].pinned).toBe(true);
+    expect(merged.tasks[0].title).toBe("Remote");
+  });
+
+  it("unions subjects by case-insensitive name, remote first", () => {
+    const local = { tasks: [], subjects: [{ name: "math", color: "#111111" }, { name: "Art", color: "#222222" }], settings: {} };
+    const remote = { tasks: [], subjects: [{ name: "Math", color: "#ffffff" }], settings: {} };
+    const merged = mergeBoards(local, remote);
+    expect(merged.subjects.map((s) => s.name)).toEqual(["Math", "Art"]);
+    expect(merged.subjects[0].color).toBe("#ffffff");
+  });
+
+  it("merges settings with local preferences winning", () => {
+    const local = { tasks: [], subjects: [], settings: { title: "My Planner", compact: true } };
+    const remote = { tasks: [], subjects: [], settings: { title: "Homework Tracker", showDone: false } };
+    const merged = mergeBoards(local, remote);
+    expect(merged.settings.title).toBe("My Planner");
+    expect(merged.settings.compact).toBe(true);
+    expect(merged.settings.showDone).toBe(false);
+  });
+
+  it("tolerates empty or missing collections", () => {
+    const merged = mergeBoards({ tasks: [mkTask({ id: "a" })] }, {});
+    expect(merged.tasks.length).toBe(1);
+    expect(mergeBoards({}, null).subjects).toEqual([]);
   });
 });
 

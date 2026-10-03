@@ -10,6 +10,7 @@ import TaskModal from "./components/TaskModal.jsx";
 import SettingsModal from "./components/SettingsModal.jsx";
 import CommandPalette from "./components/CommandPalette.jsx";
 import Toasts from "./components/Toasts.jsx";
+import { CloudSync, SyncButton } from "./cloud.jsx";
 
 const COMMANDS = [
   { id: "add-task", label: "Add Task", category: "Tasks", icon: "＋", shortcut: "N", run: (a) => a.openAdd() },
@@ -27,7 +28,7 @@ const COMMANDS = [
   { id: "shortcuts", label: "Keyboard Shortcuts", category: "Help", icon: "⌨", shortcut: "", run: (a) => a.showShortcuts() },
 ];
 
-export default function App() {
+export default function App({ cloudEnabled = false }) {
   const boot = useMemo(loadAll, []);
   const [tasks, setTasks] = useState(boot.tasks);
   const [subjects, setSubjects] = useState(boot.subjects);
@@ -59,6 +60,14 @@ export default function App() {
   useEffect(() => {
     saveAll(tasks, subjects);
   }, [tasks, subjects]);
+
+  // Apply a board pulled from the cloud (localStorage is persisted by the
+  // effect above as soon as the state updates).
+  const applyRemote = useCallback((board) => {
+    setTasks(board.tasks);
+    setSubjects(board.subjects);
+    setSettings((prev) => ({ ...prev, ...board.settings }));
+  }, []);
   useEffect(() => {
     saveAppSettings(settings);
     document.title = settings.title;
@@ -253,6 +262,7 @@ export default function App() {
 
   return (
     <div className="app">
+      {cloudEnabled && <CloudSync tasks={tasks} subjects={subjects} settings={settings} onApplyRemote={applyRemote} />}
       <canvas id="confetti-canvas" aria-hidden="true" />
       <div id="toast-container" role="log" aria-live="polite" aria-atomic="false">
         {undo && (
@@ -278,6 +288,7 @@ export default function App() {
           <p className="header-sub">Track your assignments with style</p>
         </div>
         <nav className="header-actions" aria-label="App actions">
+          {cloudEnabled && <SyncButton onMessage={toast} />}
           <button className="btn btn-ghost btn-sm" onClick={showShortcuts} title="Keyboard shortcuts: N for new task, Ctrl+K for the command palette, Esc to close" aria-label="Keyboard shortcuts help">
             ⌨ Shortcuts
           </button>
