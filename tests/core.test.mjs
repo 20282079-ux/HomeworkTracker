@@ -18,7 +18,7 @@ const { computeStats, filterAndSortTasks, getDaysLeft, formatDate, todayStr, soo
 const { DEFAULT_SUBJECTS, loadAll, uid, loadAppSettings, saveAppSettings } = await import("../src/storage.js");
 const { PRESETS, themeStyle } = await import("../src/theme.js");
 const { cmdFuzzyScore, filterCommands } = await import("../src/commands.js");
-const { mergeBoards, snapshot } = await import("../src/sync.js");
+const { mergeBoards, snapshot, normalizeSyncCode, newSyncCode } = await import("../src/sync.js");
 
 let counter = 0;
 function mkTask(overrides) {
@@ -327,6 +327,23 @@ describe("cloud sync merge", () => {
     const merged = mergeBoards({ tasks: [mkTask({ id: "a" })] }, {});
     expect(merged.tasks.length).toBe(1);
     expect(mergeBoards({}, null).subjects).toEqual([]);
+  });
+
+  it("normalizeSyncCode canonicalizes typed codes", () => {
+    expect(normalizeSyncCode("  K3M9-XQ2A PT ")).toBe("k3m9xq2apt");
+    expect(normalizeSyncCode("k3m9 xq2a")).toBe("k3m9xq2a");
+    expect(normalizeSyncCode(null)).toBe("");
+    expect(normalizeSyncCode("!!!")).toBe("");
+  });
+
+  it("newSyncCode generates 10 unambiguous lowercase alphanumerics", () => {
+    const code = newSyncCode();
+    expect(code).toMatch(/^[a-z0-9]{10}$/);
+    expect(code).not.toMatch(/[ilo01]/);
+    expect(newSyncCode(16)).toHaveLength(16);
+    const seen = new Set();
+    for (let i = 0; i < 200; i++) seen.add(newSyncCode());
+    expect(seen.size).toBe(200);
   });
 });
 

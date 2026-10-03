@@ -10,7 +10,7 @@ import TaskModal from "./components/TaskModal.jsx";
 import SettingsModal from "./components/SettingsModal.jsx";
 import CommandPalette from "./components/CommandPalette.jsx";
 import Toasts from "./components/Toasts.jsx";
-import { CloudSync, SyncButton } from "./cloud.jsx";
+import { SyncControl } from "./cloud.jsx";
 
 const COMMANDS = [
   { id: "add-task", label: "Add Task", category: "Tasks", icon: "＋", shortcut: "N", run: (a) => a.openAdd() },
@@ -262,7 +262,6 @@ export default function App({ cloudEnabled = false }) {
 
   return (
     <div className="app">
-      {cloudEnabled && <CloudSync tasks={tasks} subjects={subjects} settings={settings} onApplyRemote={applyRemote} />}
       <canvas id="confetti-canvas" aria-hidden="true" />
       <div id="toast-container" role="log" aria-live="polite" aria-atomic="false">
         {undo && (
@@ -288,7 +287,7 @@ export default function App({ cloudEnabled = false }) {
           <p className="header-sub">Track your assignments with style</p>
         </div>
         <nav className="header-actions" aria-label="App actions">
-          {cloudEnabled && <SyncButton onMessage={toast} />}
+          {cloudEnabled && <SyncControl tasks={tasks} subjects={subjects} settings={settings} onApplyRemote={applyRemote} onMessage={toast} />}
           <button className="btn btn-ghost btn-sm" onClick={showShortcuts} title="Keyboard shortcuts: N for new task, Ctrl+K for the command palette, Esc to close" aria-label="Keyboard shortcuts help">
             ⌨ Shortcuts
           </button>

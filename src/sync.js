@@ -71,3 +71,40 @@ function mergeSettings(localSettings, remoteSettings) {
   // the device you are holding), remote-only keys are kept.
   return { ...(remoteSettings || {}), ...(localSettings || {}) };
 }
+
+// ── Sync codes ──
+// Devices pair without accounts: every device that enters the same code
+// shares one board. The code is a shared secret — treat it like a password.
+// Codes are lowercase alphanumerics without ambiguous glyphs (i, l, o, 0, 1)
+// so they are painless to retype on another device.
+const CODE_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
+
+// Canonical form of a code a user typed: trim, lowercase, and strip
+// everything that is not a letter or digit (spaces, dashes, emoji …).
+export function normalizeSyncCode(raw) {
+  return String(raw == null ? "" : raw)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+// A fresh random code. Long enough that guessing another board is
+// impractical (31^10 ≈ 10^15 possibilities).
+export function newSyncCode(length = 10) {
+  const n = CODE_ALPHABET.length;
+  const limit = 256 - (256 % n); // reject the tail to avoid modulo bias
+  let out = "";
+  while (out.length < length) {
+    const bytes = new Uint8Array(length);
+    if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+      crypto.getRandomValues(bytes);
+    } else {
+      for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+    }
+    for (const b of bytes) {
+      if (b < limit) out += CODE_ALPHABET[b % n];
+      if (out.length === length) break;
+    }
+  }
+  return out;
+}

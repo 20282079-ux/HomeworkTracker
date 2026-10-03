@@ -14,7 +14,6 @@
     "icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
-    "@convex-dev/auth": "^0.0.96",
     "convex": "^1.46.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

@@ -1,11 +1,10 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { ConvexReactClient } from "convex/react";
-import { ConvexAuthProvider } from "@convex-dev/auth/react";
+import { ConvexReactClient, ConvexProvider } from "convex/react";
 import App from "./App.jsx";
 import "./index.css";
 
-// ── Cloud sync (Convex + Convex Auth with Google) ──
+// ── Cloud sync (Convex, paired by sync code — no sign-in) ──
 // Cloud sync needs a real Convex deployment URL in VITE_CONVEX_URL. Without
 // one (or with the loopback URL that `convex dev` writes locally, which no
 // browser outside the sandbox can reach) the app runs purely on
@@ -36,9 +35,9 @@ if ("serviceWorker" in navigator) {
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     {convexClient ? (
-      <ConvexAuthProvider client={convexClient}>
+      <ConvexProvider client={convexClient}>
         <App cloudEnabled />
-      </ConvexAuthProvider>
+      </ConvexProvider>
     ) : (
       <App cloudEnabled={false} />
     )}
