@@ -1,18 +1,19 @@
 // cloud.jsx — cross-device sync for the homework board, without accounts.
 //
 // Devices pair with a shared sync code: every device that enters the same
-// code reads and writes the same board in Convex. SyncControl owns the whole
-// flow — the sync engine, the header button and the pairing dialog.
+// code reads and writes the same board through the public relay in
+// relay.js — no sign-in, no API keys, no configuration. SyncControl owns the
+// whole flow — the sync engine, the header button and the pairing dialog.
 //
 // Sync model: whole-board document per code, last-writer-wins. On first
 // join the local board is merged with the shared board so nothing on the
 // device is lost. While local edits are pending (not yet pushed) incoming
-// server updates are ignored so a slow network can never clobber what you
-// just typed; once pushed, later server updates fast-forward the board.
-// localStorage stays the offline source of truth when not syncing.
+// relay updates are ignored so a slow network can never clobber what you
+// just typed; once pushed, later relay updates fast-forward the board.
+// localStorage stays the offline source of truth when not syncing, and a
+// lost connection only pauses sync — the queue flushes on reconnect.
 import { useEffect, useRef, useState } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "./convex/_generated/api.js";
+import { openBoard } from "./relay.js";
 import { mergeBoards, snapshot, normalizeSyncCode, newSyncCode } from "./sync.js";
 
 const PUSH_DEBOUNCE_MS = 500;
@@ -39,21 +40,38 @@ export function SyncControl({ tasks, subjects, settings, onApplyRemote, onMessag
   const [code, setCode] = useState(loadCode);
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
-  const remote = useQuery(api.boards.get, code ? { code } : "skip");
-  const save = useMutation(api.boards.save);
+  // Shared copy from the relay: undefined = first pull still in flight,
+  // null = this code has no shared copy yet, object = the shared board.
+  const [remote, setRemote] = useState(undefined);
+  // Relay connection: "connecting" | "online" | "offline".
+  const [conn, setConn] = useState("connecting");
 
   // Last board state that is known to match the shared copy.
   const baseline = useRef(null);
   // Whether the first pull/upload for this code has happened.
   const settled = useRef(false);
+  // The live relay session for the current code.
+  const relay = useRef(null);
 
   const board = { tasks, subjects, settings };
   const snap = snapshot(board);
 
-  // Joining, leaving or switching codes starts a fresh sync session.
+  // ── Session: joining, leaving or switching codes starts fresh ──
   useEffect(() => {
     baseline.current = null;
     settled.current = false;
+    setRemote(undefined);
+    if (!code) return;
+    setConn("connecting");
+    const session = openBoard(code, {
+      onBoard: (b) => setRemote(b),
+      onStatus: (s) => setConn(s),
+    });
+    relay.current = session;
+    return () => {
+      relay.current = null;
+      session.close();
+    };
   }, [code]);
 
   // ── Pull: react to changes made on other devices ──
@@ -65,27 +83,26 @@ export function SyncControl({ tasks, subjects, settings, onApplyRemote, onMessag
       if (remote === null) {
         // Fresh code: upload this device's board as the shared copy.
         baseline.current = snap;
-        save({ code, tasks, subjects, settings }).catch(() => {
-          baseline.current = null; // retry on the next local change
-        });
+        relay.current && relay.current.publish(snap);
       } else {
         // The code already has a board: merge so nothing local is lost,
         // then store the merged result.
         const merged = mergeBoards({ tasks, subjects, settings }, remote);
-        baseline.current = snapshot(merged);
+        const mergedSnap = snapshot(merged);
+        baseline.current = mergedSnap;
         onApplyRemote(merged);
-        save({ code, tasks: merged.tasks, subjects: merged.subjects, settings: merged.settings }).catch(() => {
-          baseline.current = null;
-        });
+        relay.current && relay.current.publish(mergedSnap);
       }
       return;
     }
     // Later updates: fast-forward only when there are no unsaved local
     // edits (their pending push would otherwise be clobbered).
-    if (remote === null) return; // still nothing on the server
+    if (remote === null) return; // still nothing on the relay
+    const next = { tasks: remote.tasks, subjects: remote.subjects, settings: remote.settings };
+    const remoteSnap = snapshot(next);
+    if (remoteSnap === baseline.current) return; // echo of our own push
     if (snap === baseline.current) {
-      const next = { tasks: remote.tasks, subjects: remote.subjects, settings: remote.settings };
-      baseline.current = snapshot(next);
+      baseline.current = remoteSnap;
       onApplyRemote(next);
     }
   }, [remote, code]);
@@ -96,12 +113,10 @@ export function SyncControl({ tasks, subjects, settings, onApplyRemote, onMessag
     if (snap === baseline.current) return;
     const timer = setTimeout(() => {
       baseline.current = snap;
-      save({ code, tasks, subjects, settings }).catch(() => {
-        baseline.current = null; // retry on the next local change
-      });
+      relay.current && relay.current.publish(snap);
     }, PUSH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [snap, code, remote === undefined]);
+  }, [snap, code, remote]);
 
   // ── Dialog: Esc closes ──
   useEffect(() => {
@@ -140,15 +155,31 @@ export function SyncControl({ tasks, subjects, settings, onApplyRemote, onMessag
     }
   };
 
+  const label = !code ? "Sync" : conn === "online" ? "Syncing" : conn === "offline" ? "Offline" : "Connecting…";
+  const buttonTitle = !code
+    ? "Sync your homework across devices — no account needed"
+    : conn === "online"
+      ? `Syncing across devices with code ${code}. Click to manage.`
+      : conn === "offline"
+        ? `Sync relay offline — edits are saved on this device and will sync when you're back online (code ${code}).`
+        : `Connecting to the sync relay (code ${code})…`;
+  const buttonLabel = !code
+    ? "Set up cloud sync across devices"
+    : conn === "online"
+      ? `Cloud sync on with code ${code}. Click to manage sync.`
+      : conn === "offline"
+        ? `Cloud sync reconnecting for code ${code}. Your edits are saved on this device.`
+        : `Connecting cloud sync for code ${code}.`;
+
   return (
     <>
       <button
         className="btn btn-ghost btn-sm"
         onClick={() => setOpen(true)}
-        title={code ? `Syncing across devices with code ${code}. Click to manage.` : "Sync your homework across devices — no account needed"}
-        aria-label={code ? `Cloud sync on with code ${code}. Click to manage sync.` : "Set up cloud sync across devices"}
+        title={buttonTitle}
+        aria-label={buttonLabel}
       >
-        ☁ {code ? "Syncing" : "Sync"}
+        ☁ {label}
       </button>
 
       {open && (
@@ -170,8 +201,8 @@ export function SyncControl({ tasks, subjects, settings, onApplyRemote, onMessag
                   />
                 </div>
                 <p id="sync-code-hint" className="task-note" style={{ marginBottom: 16 }}>
-                  Every device that enters this code shares this homework board. Treat the code like a password —
-                  don't post it anywhere public.
+                  Every device that enters this code shares this homework board. Boards travel through a public
+                  sync relay, so treat the code like a password — don't post it anywhere public.
                 </p>
                 <div className="form-actions">
                   <button type="button" className="btn btn-ghost" onClick={stop}>
@@ -193,9 +224,9 @@ export function SyncControl({ tasks, subjects, settings, onApplyRemote, onMessag
                 }}
               >
                 <p className="task-note" style={{ marginBottom: 16 }}>
-                  Keep your homework in sync on every device — no account, no sign-in. Enter the sync code shown on
-                  another device, or create a new code to start a shared board. This device's homework is merged in,
-                  so nothing is lost.
+                  Keep your homework in sync on every device — no account, no sign-in, no setup. Enter the sync
+                  code shown on another device, or create a new code to start a shared board. This device's
+                  homework is merged in, so nothing is lost.
                 </p>
                 <div className="field" style={{ marginBottom: 16 }}>
                   <label htmlFor="sync-code-input">Sync code</label>

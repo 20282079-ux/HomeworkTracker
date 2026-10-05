@@ -28,7 +28,7 @@ const COMMANDS = [
   { id: "shortcuts", label: "Keyboard Shortcuts", category: "Help", icon: "⌨", shortcut: "", run: (a) => a.showShortcuts() },
 ];
 
-export default function App({ cloudEnabled = false }) {
+export default function App() {
   const boot = useMemo(loadAll, []);
   const [tasks, setTasks] = useState(boot.tasks);
   const [subjects, setSubjects] = useState(boot.subjects);
@@ -287,7 +287,7 @@ export default function App({ cloudEnabled = false }) {
           <p className="header-sub">Track your assignments with style</p>
         </div>
         <nav className="header-actions" aria-label="App actions">
-          {cloudEnabled && <SyncControl tasks={tasks} subjects={subjects} settings={settings} onApplyRemote={applyRemote} onMessage={toast} />}
+          <SyncControl tasks={tasks} subjects={subjects} settings={settings} onApplyRemote={applyRemote} onMessage={toast} />
           <button className="btn btn-ghost btn-sm" onClick={showShortcuts} title="Keyboard shortcuts: N for new task, Ctrl+K for the command palette, Esc to close" aria-label="Keyboard shortcuts help">
             ⌨ Shortcuts
           </button>

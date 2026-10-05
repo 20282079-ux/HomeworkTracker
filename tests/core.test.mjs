@@ -4,12 +4,12 @@
 // tested directly with jsdom for browser APIs; components are exercised via
 // the structural guards below. Coverage: date math, stats, filter/sort,
 // storage round-trips + legacy-key purge, theme presets, command fuzzy
-// matching, and structural guards that keep the Vite+React shell intact and
-// removed features gone.
+// matching, sync merge + the zero-setup relay transport, and structural
+// guards that keep the Vite+React shell intact and removed features gone.
 
 // @vitest-environment jsdom
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -19,6 +19,7 @@ const { DEFAULT_SUBJECTS, loadAll, uid, loadAppSettings, saveAppSettings } = awa
 const { PRESETS, themeStyle } = await import("../src/theme.js");
 const { cmdFuzzyScore, filterCommands } = await import("../src/commands.js");
 const { mergeBoards, snapshot, normalizeSyncCode, newSyncCode } = await import("../src/sync.js");
+const { openBoard, boardTopic, RELAY_BROKERS } = await import("../src/relay.js");
 
 let counter = 0;
 function mkTask(overrides) {
@@ -348,6 +349,189 @@ describe("cloud sync merge", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+//  SYNC RELAY — the zero-setup transport (public MQTT over WebSocket)
+// ═══════════════════════════════════════════════════════════════════════
+describe("sync relay", () => {
+  const BROKERS = ["wss://a.example/mqtt", "wss://b.example/mqtt", "wss://c.example/mqtt"];
+  const PAYLOAD = JSON.stringify({ tasks: [{ id: "a" }], subjects: [], settings: {} });
+
+  // Minimal mqtt-client stand-in: the event surface openBoard drives
+  // (connect/message/close/error/offline/reconnect) plus subscribe/publish
+  // with ack callbacks.
+  function fakeClient(url) {
+    const handlers = {};
+    const client = {
+      url,
+      subs: [],
+      publishes: [],
+      ended: false,
+      on(ev, fn) {
+        (handlers[ev] || (handlers[ev] = [])).push(fn);
+      },
+      emit(ev, ...args) {
+        (handlers[ev] || []).forEach((fn) => fn(...args));
+      },
+      subscribe(topic, opts, cb) {
+        client.subs.push({ topic, opts });
+        if (cb) cb(null);
+      },
+      publish(topic, payload, opts, cb) {
+        client.publishes.push({ topic, payload, opts });
+        if (cb) cb(null);
+      },
+      end() {
+        client.ended = true;
+      },
+    };
+    return client;
+  }
+
+  function harness(code = "k3m9xq2apt", overrides = {}) {
+    const made = [];
+    const seen = { boards: [], statuses: [] };
+    const handle = openBoard(
+      code,
+      {
+        onBoard: (b) => seen.boards.push(b),
+        onStatus: (s) => seen.statuses.push(s),
+      },
+      {
+        brokers: BROKERS,
+        connect: (url) => {
+          const c = fakeClient(url);
+          made.push(c);
+          return c;
+        },
+        firstPullTimeoutMs: 50,
+        rotateRetryMs: 10,
+        rotateAfterMs: 100,
+        ...overrides,
+      }
+    );
+    return { handle, made, seen };
+  }
+
+  it("boardTopic namespaces and sanitizes codes", () => {
+    expect(boardTopic("k3m9xq2apt")).toBe("homeworktracker/v1/k3m9xq2apt");
+    expect(boardTopic("K3-9 X!")).toBe("homeworktracker/v1/k39x");
+    expect(boardTopic(null)).toBe("homeworktracker/v1/");
+    expect(RELAY_BROKERS.every((u) => u.startsWith("wss://"))).toBe(true);
+  });
+
+  it("starts every device of a code on the same broker", () => {
+    const a = harness();
+    const b = harness();
+    expect(a.made[0].url).toBe(b.made[0].url);
+    expect(BROKERS).toContain(a.made[0].url);
+    a.handle.close();
+    b.handle.close();
+  });
+
+  it("reports connecting → online → offline around the session", () => {
+    vi.useFakeTimers();
+    const { handle, made, seen } = harness();
+    expect(seen.statuses).toEqual(["connecting"]);
+    made[0].emit("connect");
+    expect(seen.statuses).toEqual(["connecting", "online"]);
+    made[0].emit("close");
+    expect(seen.statuses).toEqual(["connecting", "online", "offline"]);
+    handle.close();
+    vi.useRealTimers();
+  });
+
+  it("verdicts a fresh code only when the relay stays silent", () => {
+    vi.useFakeTimers();
+    const { handle, made, seen } = harness();
+    made[0].emit("connect");
+    expect(seen.boards).toEqual([]);
+    vi.advanceTimersByTime(60);
+    expect(seen.boards).toEqual([null]);
+    handle.close();
+    vi.useRealTimers();
+  });
+
+  it("delivers the retained board and withholds the fresh verdict", () => {
+    vi.useFakeTimers();
+    const { handle, made, seen } = harness();
+    made[0].emit("connect");
+    made[0].emit("message", boardTopic("k3m9xq2apt"), { toString: () => PAYLOAD });
+    expect(seen.boards).toHaveLength(1);
+    expect(seen.boards[0].tasks).toHaveLength(1);
+    vi.advanceTimersByTime(100);
+    expect(seen.boards).toHaveLength(1); // no null verdict afterwards
+    handle.close();
+    vi.useRealTimers();
+  });
+
+  it("ignores junk payloads on the public topic", () => {
+    vi.useFakeTimers();
+    const { handle, made, seen } = harness();
+    made[0].emit("connect");
+    made[0].emit("message", boardTopic("k3m9xq2apt"), { toString: () => "not json" });
+    made[0].emit("message", boardTopic("k3m9xq2apt"), { toString: () => '{"nope":1}' });
+    expect(seen.boards).toEqual([]);
+    handle.close();
+    vi.useRealTimers();
+  });
+
+  it("queues publishes while offline and flushes them as retained QoS1", () => {
+    const { handle, made } = harness();
+    handle.publish(PAYLOAD); // not connected yet — must not vanish
+    expect(made[0].publishes).toHaveLength(0);
+    made[0].emit("connect");
+    expect(made[0].publishes).toHaveLength(1);
+    expect(made[0].publishes[0]).toMatchObject({
+      topic: "homeworktracker/v1/k3m9xq2apt",
+      payload: PAYLOAD,
+      opts: { qos: 1, retain: true },
+    });
+    handle.publish(PAYLOAD); // acknowledged — the next publish goes straight out
+    expect(made[0].publishes).toHaveLength(2);
+    handle.close();
+    expect(made[0].ended).toBe(true);
+  });
+
+  it("fails over to the next broker only after two failed attempts", () => {
+    vi.useFakeTimers();
+    const { handle, made, seen } = harness();
+    const startIdx = BROKERS.indexOf(made[0].url);
+    made[0].emit("close"); // attempt 1 failed — mqtt.js would retry
+    vi.advanceTimersByTime(15);
+    expect(made).toHaveLength(1);
+    made[0].emit("close"); // attempt 2 failed — give up on this broker
+    vi.advanceTimersByTime(15);
+    expect(made).toHaveLength(2);
+    expect(made[1].url).toBe(BROKERS[(startIdx + 1) % BROKERS.length]);
+    made[1].emit("connect");
+    expect(seen.statuses[seen.statuses.length - 1]).toBe("online");
+    handle.close();
+    vi.useRealTimers();
+  });
+
+  it("re-seeds an empty broker after a long outage", () => {
+    vi.useFakeTimers();
+    const { handle, made } = harness();
+    made[0].emit("connect");
+    vi.advanceTimersByTime(60); // fresh verdict
+    handle.publish(PAYLOAD);
+    expect(made[0].publishes).toHaveLength(1);
+    // Connection drops for longer than the rotation threshold → move on and,
+    // finding nothing on the new broker, republish the last known board.
+    made[0].emit("close");
+    vi.advanceTimersByTime(101);
+    made[0].emit("reconnect");
+    vi.advanceTimersByTime(15);
+    expect(made).toHaveLength(2);
+    made[1].emit("connect");
+    vi.advanceTimersByTime(60);
+    expect(made[1].publishes).toHaveLength(1);
+    expect(made[1].publishes[0].payload).toBe(PAYLOAD);
+    handle.close();
+    vi.useRealTimers();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 //  STRUCTURAL GUARDS — the Vite+React shell and the removed features
 // ═══════════════════════════════════════════════════════════════════════
 describe("structural guards", () => {
@@ -394,6 +578,16 @@ describe("structural guards", () => {
     const sw = readFileSync(resolve(ROOT, "public/sw.js"), "utf8");
     expect(sw).toMatch(/'hw-tracker-v\d+'/);
     expect(sw).not.toMatch(/js\/(state|tasks|app|settings|util|command-palette|tests|gamification|devmode)\.js/);
+  });
+
+  it("sync ships with zero setup: no accounts, keys or env config", () => {
+    const main = readFileSync(resolve(ROOT, "src/main.jsx"), "utf8");
+    const cloud = readFileSync(resolve(ROOT, "src/cloud.jsx"), "utf8");
+    const relay = readFileSync(resolve(ROOT, "src/relay.js"), "utf8");
+    expect(main).not.toMatch(/convex|VITE_CONVEX_URL/);
+    expect(cloud).not.toMatch(/convex|useQuery|useMutation|signIn|useAuthActions/);
+    expect(relay).toMatch(/wss:/); // anonymous public relay, port 443
+    expect(relay).not.toMatch(/apiKey|API_KEY|secret|bearer/i);
   });
 
   it("the manifest and icons ship in public/", () => {
